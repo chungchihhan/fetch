@@ -64,14 +64,14 @@ struct SnippetRowView: View {
     }
 
     private var backgroundFill: Color {
-        if isEditing { return Color(hex: "#f9e2af").opacity(0.05) }
-        if isFocused { return Color(hex: "#89b4fa").opacity(0.07) }
+        if isEditing { return Color(hex: "#f9e2af").opacity(0.12) }
+        if isFocused { return Color(hex: "#89b4fa").opacity(0.20) }
         return .clear
     }
 
     private var borderColor: Color {
-        if isEditing { return Color(hex: "#f9e2af").opacity(0.30) }
-        if isFocused { return Color(hex: "#89b4fa").opacity(0.35) }
-        return .clear
+        if isEditing { return Color(hex: "#f9e2af").opacity(0.70) }
+        if isFocused { return Color(hex: "#89b4fa").opacity(0.80) }
+        return Color.white.opacity(0.08)
     }
 }

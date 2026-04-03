@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panel: NSPanel?
     let store = SnippetStore()
     var hotKeyManager: HotKeyManager?
+    var eventMonitor: Any?
     var isPanel = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -15,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupStatusItem()
         setupPopover()
+
+        // Request accessibility permission (required for global ⌘J hotkey)
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        AXIsProcessTrustedWithOptions(opts as CFDictionary)
 
         hotKeyManager = HotKeyManager { [weak self] in
             self?.togglePopover()
@@ -34,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupPopover() {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 380, height: 300)
-        popover.behavior = .transient      // closes on click-outside
+        popover.behavior = .applicationDefined
         popover.animates = false
         popover.contentViewController = NSHostingController(
             rootView: PopoverContentView()
@@ -45,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         // Remove the popover arrow
         popover.setValue(false, forKeyPath: "shouldHaveArrow")
+
+        // Close popover on click outside
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self, self.popover.isShown else { return }
+            self.popover.performClose(nil)
+        }
 
         // Save all snippets when popover closes
         NotificationCenter.default.addObserver(
@@ -63,7 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let button = statusItem.button else { return }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
-            NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
+            }
         }
     }
 

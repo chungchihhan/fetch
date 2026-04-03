@@ -53,8 +53,16 @@ struct SnippetListView: View {
 
     private func binding(for index: Int) -> Binding<Snippet> {
         Binding(
-            get: { store.tabs[store.activeTab][index] },
-            set: { store.tabs[store.activeTab][index] = $0 }
+            get: {
+                let tab = store.activeTab
+                guard index < store.tabs[tab].count else { return Snippet(title: "", code: "") }
+                return store.tabs[tab][index]
+            },
+            set: {
+                let tab = store.activeTab
+                guard index < store.tabs[tab].count else { return }
+                store.tabs[tab][index] = $0
+            }
         )
     }
 
@@ -85,7 +93,9 @@ struct SnippetListView: View {
         switch event.keyCode {
         case 125: moveFocus(by: 1); return true        // ↓
         case 126: moveFocus(by: -1); return true       // ↑
-        case 36:  enterEditMode(); return true         // Enter
+        case 36:                                        // Enter
+            if focusedIndex == nil, !snippets.isEmpty { focusedIndex = 0 }
+            enterEditMode(); return true
         case 53:  closeApp(); return true              // Esc
         case 8 where event.modifierFlags.contains(.command): // ⌘C
             copyFocusedCode(); return true
@@ -170,9 +180,20 @@ struct KeyInterceptView<Content: View>: NSViewRepresentable {
 
 final class KeyCatchingNSView: NSView {
     var onKey: ((NSEvent) -> Bool)?
-    override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {
-        if onKey?(event) != true { super.keyDown(with: event) }
+    private var localMonitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let m = localMonitor { NSEvent.removeMonitor(m); localMonitor = nil }
+        guard window != nil else { return }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            return self.onKey?(event) == true ? nil : event
+        }
+    }
+
+    deinit {
+        if let m = localMonitor { NSEvent.removeMonitor(m) }
     }
 }
 
