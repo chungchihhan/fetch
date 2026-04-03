@@ -1,15 +1,24 @@
 import SwiftUI
 import AppKit
 
+// Reference-type state so mutations from the key handler always propagate
+@Observable
+private final class ListNavState {
+    var focusedIndex: Int? = nil
+    var isEditing: Bool = false
+}
+
 struct SnippetListView: View {
     @Environment(SnippetStore.self) var store
-    @State private var focusedIndex: Int? = nil
-    @State private var isEditing: Bool = false
+    @State private var nav = ListNavState()
 
     var snippets: [Snippet] { store.tabs[store.activeTab] }
 
     var body: some View {
-        KeyInterceptView(onKey: handleKey) {
+        // Build a key handler that captures nav and store as references
+        let handler = makeKeyHandler(nav: nav, store: store)
+
+        KeyInterceptView(onKey: handler) {
             if snippets.isEmpty {
                 Text("Press ⌘N to add a snippet")
                     .font(.system(size: 11, design: .monospaced))
@@ -19,34 +28,34 @@ struct SnippetListView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         LazyVStack(spacing: 10) {
-                            ForEach(Array(snippets.enumerated()), id: \.element.id) { i, snippet in
+                            ForEach(Array(snippets.enumerated()), id: \.element.id) { i, _ in
                                 SnippetRowView(
                                     snippet: binding(for: i),
-                                    isFocused: focusedIndex == i,
-                                    isEditing: isEditing && focusedIndex == i,
+                                    isFocused: nav.focusedIndex == i,
+                                    isEditing: nav.isEditing && nav.focusedIndex == i,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 }
                                 )
                                 .id(i)
-                                .onTapGesture { focusedIndex = i }
+                                .onTapGesture { nav.focusedIndex = i }
                             }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                     }
-                    .onChange(of: focusedIndex) { _, idx in
+                    .onChange(of: nav.focusedIndex) { _, idx in
                         if let idx { proxy.scrollTo(idx, anchor: .center) }
                     }
                 }
             }
         }
         .onChange(of: store.activeTab) { _, _ in
-            focusedIndex = snippets.isEmpty ? nil : 0
-            isEditing = false
+            nav.focusedIndex = snippets.isEmpty ? nil : 0
+            nav.isEditing = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidOpen)) { _ in
-            if focusedIndex == nil, !snippets.isEmpty {
-                focusedIndex = 0
+            if nav.focusedIndex == nil, !snippets.isEmpty {
+                nav.focusedIndex = 0
             }
         }
     }
@@ -66,89 +75,87 @@ struct SnippetListView: View {
         )
     }
 
-    private func handleKey(_ event: NSEvent) -> Bool {
-        let tab = store.activeTab
+    private func makeKeyHandler(nav: ListNavState, store: SnippetStore) -> (NSEvent) -> Bool {
+        { event in
+            let snippets = store.tabs[store.activeTab]
+            let tab = store.activeTab
 
-        if isEditing {
+            if nav.isEditing {
+                switch event.keyCode {
+                case 53: // Esc — save and exit edit
+                    nav.isEditing = false
+                    NotificationCenter.default.post(name: .editModeChanged, object: false)
+                    store.save(tab: tab)
+                    return true
+                case 125, 126: // ↓↑ — save, exit edit, move focus
+                    nav.isEditing = false
+                    NotificationCenter.default.post(name: .editModeChanged, object: false)
+                    store.save(tab: tab)
+                    let delta = event.keyCode == 125 ? 1 : -1
+                    if !snippets.isEmpty {
+                        let current = nav.focusedIndex ?? (delta > 0 ? -1 : snippets.count)
+                        nav.focusedIndex = max(0, min(snippets.count - 1, current + delta))
+                    }
+                    return true
+                case 48: // Tab — pass through to text fields
+                    return false
+                default:
+                    return false
+                }
+            }
+
+            // Browse mode
             switch event.keyCode {
-            case 53: // Esc — save and exit edit
-                isEditing = false
-                NotificationCenter.default.post(name: .editModeChanged, object: false)
-                store.save(tab: tab)
+            case 125: // ↓
+                if !snippets.isEmpty {
+                    let current = nav.focusedIndex ?? -1
+                    nav.focusedIndex = max(0, min(snippets.count - 1, current + 1))
+                }
                 return true
-            case 125, 126: // ↓↑ — save, exit edit, move focus
-                isEditing = false
-                NotificationCenter.default.post(name: .editModeChanged, object: false)
-                store.save(tab: tab)
-                moveFocus(by: event.keyCode == 125 ? 1 : -1)
+            case 126: // ↑
+                if !snippets.isEmpty {
+                    let current = nav.focusedIndex ?? snippets.count
+                    nav.focusedIndex = max(0, min(snippets.count - 1, current - 1))
+                }
                 return true
-            case 48: // Tab — let it pass through to SwiftUI text fields
-                return false
+            case 36: // Enter
+                if nav.focusedIndex == nil, !snippets.isEmpty { nav.focusedIndex = 0 }
+                if nav.focusedIndex != nil {
+                    nav.isEditing = true
+                    NotificationCenter.default.post(name: .editModeChanged, object: true)
+                }
+                return true
+            case 53: // Esc
+                NotificationCenter.default.post(name: NSPopover.willCloseNotification, object: nil)
+                NSApp.hide(nil)
+                return true
+            case 8 where event.modifierFlags.contains(.command): // ⌘C
+                if let i = nav.focusedIndex, i < snippets.count {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                }
+                return true
+            case 45 where event.modifierFlags.contains(.command): // ⌘N
+                store.addSnippet()
+                nav.focusedIndex = store.tabs[tab].count - 1
+                nav.isEditing = true
+                NotificationCenter.default.post(name: .editModeChanged, object: true)
+                return true
+            case 2 where event.modifierFlags.contains(.command): // ⌘D
+                if let i = nav.focusedIndex, i < snippets.count {
+                    store.deleteSnippet(id: snippets[i].id, tab: tab)
+                    let remaining = store.tabs[tab]
+                    nav.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
+                }
+                return true
             default:
-                return false // let typing pass through to text fields
+                return false
             }
         }
-
-        // Browse mode
-        switch event.keyCode {
-        case 125: moveFocus(by: 1); return true        // ↓
-        case 126: moveFocus(by: -1); return true       // ↑
-        case 36:                                        // Enter
-            if focusedIndex == nil, !snippets.isEmpty { focusedIndex = 0 }
-            enterEditMode(); return true
-        case 53:  closeApp(); return true              // Esc
-        case 8 where event.modifierFlags.contains(.command): // ⌘C
-            copyFocusedCode(); return true
-        case 45 where event.modifierFlags.contains(.command): // ⌘N
-            addSnippet(); return true
-        case 2 where event.modifierFlags.contains(.command):  // ⌘D
-            deleteFocused(); return true
-        default: return false
-        }
-    }
-
-    private func moveFocus(by delta: Int) {
-        guard !snippets.isEmpty else { return }
-        let current = focusedIndex ?? (delta > 0 ? -1 : snippets.count)
-        focusedIndex = max(0, min(snippets.count - 1, current + delta))
-    }
-
-    private func enterEditMode() {
-        guard focusedIndex != nil else { return }
-        isEditing = true
-        NotificationCenter.default.post(name: .editModeChanged, object: true)
-    }
-
-    private func copyFocusedCode() {
-        guard let i = focusedIndex, i < snippets.count else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(snippets[i].code, forType: .string)
-    }
-
-    private func addSnippet() {
-        store.addSnippet()
-        focusedIndex = snippets.count - 1
-        isEditing = true
-    }
-
-    private func deleteFocused() {
-        guard let i = focusedIndex, i < snippets.count else { return }
-        let id = snippets[i].id
-        store.deleteSnippet(id: id, tab: store.activeTab)
-        if snippets.isEmpty {
-            focusedIndex = nil
-        } else {
-            focusedIndex = max(0, i - 1)
-        }
-    }
-
-    private func closeApp() {
-        NotificationCenter.default.post(name: NSPopover.willCloseNotification, object: nil)
-        NSApp.hide(nil)
     }
 }
 
-// NSViewRepresentable that intercepts key events before SwiftUI sees them
+// NSViewRepresentable that installs a local key monitor
 struct KeyInterceptView<Content: View>: NSViewRepresentable {
     let onKey: (NSEvent) -> Bool
     let content: Content
