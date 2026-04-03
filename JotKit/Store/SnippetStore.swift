@@ -8,7 +8,7 @@ final class SnippetStore {
 
     private let storageDirectory: URL
 
-    init(storageDirectory: URL = Self.defaultDirectory) {
+    init(storageDirectory: URL = SnippetStore.defaultDirectory) {
         self.storageDirectory = storageDirectory
         loadAll()
     }

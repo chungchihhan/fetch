@@ -1,0 +1,24 @@
+{
+  "originHash" : "e16b50f7056c2b3f36c716019c67284e6b8f14002ba0be85d46dc6fe85434dc2",
+  "pins" : [
+    {
+      "identity" : "highlightr",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/raspu/Highlightr",
+      "state" : {
+        "revision" : "05e7fcc63b33925cd0c1faaa205cdd5681e7bbef",
+        "version" : "2.3.0"
+      }
+    },
+    {
+      "identity" : "hotkey",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/soffes/HotKey",
+      "state" : {
+        "revision" : "a3cf605d7a96f6ff50e04fcb6dea6e2613cfcbe4",
+        "version" : "0.2.1"
+      }
+    }
+  ],
+  "version" : 3
+}

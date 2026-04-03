@@ -1,0 +1,47 @@
+name: JotKit
+options:
+  bundleIdPrefix: com.harrychung
+  createIntermediateGroups: true
+
+packages:
+  HotKey:
+    url: https://github.com/soffes/HotKey
+    from: "0.2.0"
+  Highlightr:
+    url: https://github.com/raspu/Highlightr
+    from: "2.1.2"
+
+targets:
+  JotKit:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - JotKit
+    dependencies:
+      - package: HotKey
+      - package: Highlightr
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+    info:
+      path: JotKit/Info.plist
+      properties:
+        CFBundleName: JotKit
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        LSUIElement: YES
+
+  JotKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - JotKitTests
+    dependencies:
+      - target: JotKit
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
