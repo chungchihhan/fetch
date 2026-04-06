@@ -84,6 +84,12 @@ struct HighlightedCodeView: NSViewRepresentable {
         let justStoppedEditing = coord.wasEditing && !isEditing
         coord.wasEditing = isEditing
 
+        // Release AppKit first responder when exiting edit mode entirely so
+        // SwiftUI's @FocusState can work correctly on the next edit entry.
+        if justStoppedEditing && textView.window?.firstResponder === textView {
+            textView.window?.makeFirstResponder(nil)
+        }
+
         if isEditing {
             if textView.string != code {
                 textView.string = code

@@ -4,10 +4,16 @@ import AppKit
 // Reference-type state so mutations from the key handler always propagate
 @Observable
 private final class ListNavState {
+    var focusedTab: Int = 0      // which tab the selection belongs to
     var focusedIndex: Int? = nil
     var editStep: Int = 0        // 0=browse, 1=title edit, 2=code edit
     var cursorOnFirstLine: Bool = true
     var isEditing: Bool { editStep > 0 }
+
+    func setFocus(_ index: Int?, tab: Int) {
+        focusedTab = tab
+        focusedIndex = index
+    }
 }
 
 struct SnippetListView: View {
@@ -17,10 +23,14 @@ struct SnippetListView: View {
     var snippets: [Snippet] { store.tabs[store.activeTab] }
 
     var body: some View {
-        // Build a key handler that captures nav and store as references
         let handler = makeKeyHandler(nav: nav, store: store)
 
-        KeyInterceptView(onKey: handler) {
+        ZStack {
+            // Zero-size background view that installs the key monitor
+            KeyMonitorView(onKey: handler)
+                .frame(width: 0, height: 0)
+
+            // Content stays in normal SwiftUI hierarchy for proper @Observable tracking
             if snippets.isEmpty {
                 Text("Press ⌘N to add a snippet")
                     .font(.system(size: 11, design: .monospaced))
@@ -29,18 +39,18 @@ struct SnippetListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(spacing: 10) {
+                        VStack(spacing: 10) {
                             ForEach(Array(snippets.enumerated()), id: \.element.id) { i, _ in
                                 SnippetRowView(
                                     snippet: binding(for: i),
-                                    isFocused: nav.focusedIndex == i,
-                                    editStep: nav.focusedIndex == i ? nav.editStep : 0,
+                                    isFocused: nav.focusedTab == store.activeTab && nav.focusedIndex == i,
+                                    editStep: nav.focusedTab == store.activeTab && nav.focusedIndex == i ? nav.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
                                     onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
                                 )
                                 .id(i)
-                                .onTapGesture { nav.focusedIndex = i }
+                                .onTapGesture { nav.setFocus(i, tab: store.activeTab) }
                             }
                         }
                         .padding(.horizontal, 12)
@@ -52,13 +62,16 @@ struct SnippetListView: View {
                 }
             }
         }
-        .onChange(of: store.activeTab) { _, _ in
-            nav.focusedIndex = snippets.isEmpty ? nil : 0
+        .onChange(of: store.activeTab) { _, newTab in
             nav.editStep = 0
+            nav.cursorOnFirstLine = true
+            let tabSnippets = store.tabs[newTab]
+            nav.setFocus(tabSnippets.isEmpty ? nil : 0, tab: newTab)
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidOpen)) { _ in
+            let tab = store.activeTab
             if nav.focusedIndex == nil, !snippets.isEmpty {
-                nav.focusedIndex = 0
+                nav.setFocus(0, tab: tab)
             }
         }
     }
@@ -84,8 +97,9 @@ struct SnippetListView: View {
             let tab = store.activeTab
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
+
             func enterEdit() {
-                if nav.focusedIndex == nil, !snippets.isEmpty { nav.focusedIndex = 0 }
+                if nav.focusedIndex == nil, !snippets.isEmpty { nav.setFocus(0, tab: tab) }
                 guard nav.focusedIndex != nil else { return }
                 nav.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
@@ -151,14 +165,14 @@ struct SnippetListView: View {
             case 125:                               // ↓ — next snippet
                 if !snippets.isEmpty {
                     let current = nav.focusedIndex ?? -1
-                    nav.focusedIndex = max(0, min(snippets.count - 1, current + 1))
+                    nav.setFocus(max(0, min(snippets.count - 1, current + 1)), tab: tab)
                 }
                 return true
 
             case 126:                               // ↑ — prev snippet
                 if !snippets.isEmpty {
                     let current = nav.focusedIndex ?? snippets.count
-                    nav.focusedIndex = max(0, min(snippets.count - 1, current - 1))
+                    nav.setFocus(max(0, min(snippets.count - 1, current - 1)), tab: tab)
                 }
                 return true
 
@@ -176,7 +190,7 @@ struct SnippetListView: View {
 
             case 45 where flags.contains(.command): // ⌘N — new snippet
                 store.addSnippet()
-                nav.focusedIndex = store.tabs[tab].count - 1
+                nav.setFocus(store.tabs[tab].count - 1, tab: tab)
                 enterEdit()
                 return true
 
@@ -184,7 +198,7 @@ struct SnippetListView: View {
                 if let i = nav.focusedIndex, i < snippets.count {
                     store.deleteSnippet(id: snippets[i].id, tab: tab)
                     let remaining = store.tabs[tab]
-                    nav.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
+                    nav.setFocus(remaining.isEmpty ? nil : max(0, i - 1), tab: tab)
                 }
                 return true
 
@@ -195,28 +209,13 @@ struct SnippetListView: View {
     }
 }
 
-// NSViewRepresentable that installs a local key monitor
-struct KeyInterceptView<Content: View>: NSViewRepresentable {
+// Zero-size NSViewRepresentable — only installs a local key monitor
+struct KeyMonitorView: NSViewRepresentable {
     let onKey: (NSEvent) -> Bool
-    let content: Content
-
-    init(onKey: @escaping (NSEvent) -> Bool, @ViewBuilder content: () -> Content) {
-        self.onKey = onKey
-        self.content = content()
-    }
 
     func makeNSView(context: Context) -> KeyCatchingNSView {
         let v = KeyCatchingNSView()
         v.onKey = onKey
-        let host = NSHostingView(rootView: content)
-        host.translatesAutoresizingMaskIntoConstraints = false
-        v.addSubview(host)
-        NSLayoutConstraint.activate([
-            host.topAnchor.constraint(equalTo: v.topAnchor),
-            host.bottomAnchor.constraint(equalTo: v.bottomAnchor),
-            host.leadingAnchor.constraint(equalTo: v.leadingAnchor),
-            host.trailingAnchor.constraint(equalTo: v.trailingAnchor),
-        ])
         return v
     }
 

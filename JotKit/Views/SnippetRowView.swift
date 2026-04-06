@@ -74,6 +74,9 @@ struct SnippetRowView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 1)
         )
+        .onAppear {
+            focusedField = editStep == 1 ? .title : nil
+        }
         .onChange(of: editStep) { _, step in
             focusedField = step == 1 ? .title : nil
         }

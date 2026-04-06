@@ -21,12 +21,16 @@ final class SnippetStore {
     }
 
     func addSnippet() {
-        tabs[activeTab].append(Snippet(title: "", code: ""))
+        var updated = tabs[activeTab]
+        updated.append(Snippet(title: "", code: ""))
+        tabs[activeTab] = updated           // explicit set → reliable @Observable notification
         save(tab: activeTab)
     }
 
     func deleteSnippet(id: UUID, tab: Int) {
-        tabs[tab].removeAll { $0.id == id }
+        var updated = tabs[tab]
+        updated.removeAll { $0.id == id }
+        tabs[tab] = updated                 // explicit set → reliable @Observable notification
         save(tab: tab)
     }
 
