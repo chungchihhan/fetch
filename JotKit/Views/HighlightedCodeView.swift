@@ -36,6 +36,7 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        context.coordinator.onCodeChange = onCodeChange   // keep callback fresh
         textView.isEditable = isEditing
         if focusCode, isEditing, textView.window?.firstResponder !== textView {
             textView.window?.makeFirstResponder(textView)
