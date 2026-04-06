@@ -5,6 +5,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     var code: String
     var language: String
     var isEditing: Bool
+    var focusCode: Bool = false
     var onCodeChange: ((String) -> Void)?
 
     private let highlightr: Highlightr = {
@@ -36,6 +37,9 @@ struct HighlightedCodeView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         textView.isEditable = isEditing
+        if focusCode, isEditing, textView.window?.firstResponder !== textView {
+            textView.window?.makeFirstResponder(textView)
+        }
 
         // Only re-highlight if code changed to avoid cursor jump during editing
         if textView.string != code {

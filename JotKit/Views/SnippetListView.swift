@@ -5,7 +5,8 @@ import AppKit
 @Observable
 private final class ListNavState {
     var focusedIndex: Int? = nil
-    var isEditing: Bool = false
+    var editStep: Int = 0        // 0=browse, 1=title edit, 2=code edit
+    var isEditing: Bool { editStep > 0 }
 }
 
 struct SnippetListView: View {
@@ -32,7 +33,7 @@ struct SnippetListView: View {
                                 SnippetRowView(
                                     snippet: binding(for: i),
                                     isFocused: nav.focusedIndex == i,
-                                    isEditing: nav.isEditing && nav.focusedIndex == i,
+                                    editStep: nav.focusedIndex == i ? nav.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 }
                                 )
@@ -51,7 +52,7 @@ struct SnippetListView: View {
         }
         .onChange(of: store.activeTab) { _, _ in
             nav.focusedIndex = snippets.isEmpty ? nil : 0
-            nav.isEditing = false
+            nav.editStep = 0
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidOpen)) { _ in
             if nav.focusedIndex == nil, !snippets.isEmpty {
@@ -80,17 +81,27 @@ struct SnippetListView: View {
             let snippets = store.tabs[store.activeTab]
             let tab = store.activeTab
 
-            if nav.isEditing {
+            // --- Edit mode ---
+            if nav.editStep > 0 {
                 switch event.keyCode {
-                case 53: // Esc — save and exit edit
-                    nav.isEditing = false
-                    NotificationCenter.default.post(name: .editModeChanged, object: false)
-                    store.save(tab: tab)
+                case 36: // Enter — cycle to next step
+                    if nav.editStep == 1 {
+                        nav.editStep = 2        // title → code
+                    } else {
+                        nav.editStep = 0        // code → browse, save
+                        store.save(tab: tab)
+                        NotificationCenter.default.post(name: .editModeChanged, object: false)
+                    }
                     return true
-                case 125, 126: // ↓↑ — save, exit edit, move focus
-                    nav.isEditing = false
-                    NotificationCenter.default.post(name: .editModeChanged, object: false)
+                case 53: // Esc — save and exit
+                    nav.editStep = 0
                     store.save(tab: tab)
+                    NotificationCenter.default.post(name: .editModeChanged, object: false)
+                    return true
+                case 125, 126: // ↓↑ — save, exit, move focus
+                    nav.editStep = 0
+                    store.save(tab: tab)
+                    NotificationCenter.default.post(name: .editModeChanged, object: false)
                     let delta = event.keyCode == 125 ? 1 : -1
                     if !snippets.isEmpty {
                         let current = nav.focusedIndex ?? (delta > 0 ? -1 : snippets.count)
@@ -100,11 +111,11 @@ struct SnippetListView: View {
                 case 48: // Tab — pass through to text fields
                     return false
                 default:
-                    return false
+                    return nav.editStep == 1 ? false : false // let typing through
                 }
             }
 
-            // Browse mode
+            // --- Browse mode ---
             switch event.keyCode {
             case 125: // ↓
                 if !snippets.isEmpty {
@@ -118,14 +129,14 @@ struct SnippetListView: View {
                     nav.focusedIndex = max(0, min(snippets.count - 1, current - 1))
                 }
                 return true
-            case 36: // Enter
+            case 36: // Enter — start editing (title)
                 if nav.focusedIndex == nil, !snippets.isEmpty { nav.focusedIndex = 0 }
                 if nav.focusedIndex != nil {
-                    nav.isEditing = true
+                    nav.editStep = 1
                     NotificationCenter.default.post(name: .editModeChanged, object: true)
                 }
                 return true
-            case 53: // Esc
+            case 53: // Esc — close popover
                 NotificationCenter.default.post(name: NSPopover.willCloseNotification, object: nil)
                 NSApp.hide(nil)
                 return true
@@ -138,7 +149,7 @@ struct SnippetListView: View {
             case 45 where event.modifierFlags.contains(.command): // ⌘N
                 store.addSnippet()
                 nav.focusedIndex = store.tabs[tab].count - 1
-                nav.isEditing = true
+                nav.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
                 return true
             case 2 where event.modifierFlags.contains(.command): // ⌘D

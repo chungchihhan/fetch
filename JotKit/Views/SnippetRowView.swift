@@ -5,18 +5,16 @@ enum SnippetField: Hashable { case title, code }
 struct SnippetRowView: View {
     @Binding var snippet: Snippet
     var isFocused: Bool
-    var isEditing: Bool
+    var editStep: Int        // 0=browse, 1=title edit, 2=code edit
     var onTitleChange: (String) -> Void
     var onCodeChange: (String) -> Void
 
-    // Drives Tab-switching: when isEditing turns true, .title is focused.
-    // The user presses Tab → macOS moves to the next key view (the NSTextView
-    // inside HighlightedCodeView) via the standard AppKit responder chain.
     @FocusState private var focusedField: SnippetField?
+
+    private var isEditing: Bool { editStep > 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Title row: "# title"
             HStack(spacing: 4) {
                 Text("#")
                     .font(.system(size: 11, design: .monospaced))
@@ -37,12 +35,11 @@ struct SnippetRowView: View {
                 }
             }
 
-            // Code block. NSTextView is a natural key view successor to
-            // the title TextField — Tab moves into it automatically.
             HighlightedCodeView(
                 code: snippet.code,
                 language: snippet.language,
                 isEditing: isEditing,
+                focusCode: editStep == 2,
                 onCodeChange: isEditing ? onCodeChange : nil
             )
             .frame(minHeight: 28)
@@ -57,9 +54,8 @@ struct SnippetRowView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 1)
         )
-        // Auto-focus title field when this row enters edit mode
-        .onChange(of: isEditing) { _, editing in
-            focusedField = editing ? .title : nil
+        .onChange(of: editStep) { _, step in
+            focusedField = step == 1 ? .title : nil
         }
     }
 
