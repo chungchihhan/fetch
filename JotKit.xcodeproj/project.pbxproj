@@ -12,9 +12,8 @@
 		206FEBBE157DB60E89D309DC /* JotKitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323A76E8AA9D94B7EFD2D1F2 /* JotKitApp.swift */; };
 		2F160923810BAC01867A954F /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4050B3271298C37748D9A5E5 /* SnippetStore.swift */; };
 		5B9E6BF35F522C58E6121F51 /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40DF341A1B131D13FB289898 /* SnippetStoreTests.swift */; };
-		6AD902A1A777CC2D4ED3DFF1 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = E07DCF2BF56D14011FE450E5 /* Highlightr */; };
 		80ADB8A530463E744AA612DC /* HintBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E940A19EF2CF5C44B9471E0E /* HintBarView.swift */; };
-		8FE418CD18027918D598C4F9 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = F069F81E8AC624193A6453F5 /* HotKey */; };
+		8FE418CD18027918D598C4F9 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = E07DCF2BF56D14011FE450E5 /* Highlightr */; };
 		A023CADD3D2EDA1BC1DFEDE8 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D13BBA92B2F22692117AE2B /* HotKeyManager.swift */; };
 		A056A7718546F0A8F8864AB2 /* HighlightedCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5144094C9E47EE7FCB6AF0 /* HighlightedCodeView.swift */; };
 		A1B1A0969A881D78F2B8801D /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AC95D3CE7E45AF50626FA7 /* PopoverContentView.swift */; };
@@ -58,8 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8FE418CD18027918D598C4F9 /* HotKey in Frameworks */,
-				6AD902A1A777CC2D4ED3DFF1 /* Highlightr in Frameworks */,
+				8FE418CD18027918D598C4F9 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -152,7 +150,6 @@
 			);
 			name = JotKit;
 			packageProductDependencies = (
-				F069F81E8AC624193A6453F5 /* HotKey */,
 				E07DCF2BF56D14011FE450E5 /* Highlightr */,
 			);
 			productName = JotKit;
@@ -199,7 +196,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				88C6925D4265D5849452818B /* XCRemoteSwiftPackageReference "Highlightr" */,
-				D35B0D44908D2BBD45E4842D /* XCRemoteSwiftPackageReference "HotKey" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CDCC320AEF1D7CA4947EBC8F /* Products */;
@@ -481,14 +477,6 @@
 				minimumVersion = 2.1.2;
 			};
 		};
-		D35B0D44908D2BBD45E4842D /* XCRemoteSwiftPackageReference "HotKey" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/soffes/HotKey";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.2.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -496,11 +484,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 88C6925D4265D5849452818B /* XCRemoteSwiftPackageReference "Highlightr" */;
 			productName = Highlightr;
-		};
-		F069F81E8AC624193A6453F5 /* HotKey */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D35B0D44908D2BBD45E4842D /* XCRemoteSwiftPackageReference "HotKey" */;
-			productName = HotKey;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

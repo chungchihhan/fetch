@@ -17,10 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupPopover()
 
-        // Request accessibility permission (required for global ⌘J hotkey)
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(opts as CFDictionary)
-
         hotKeyManager = HotKeyManager { [weak self] in
             self?.togglePopover()
         }

@@ -4,9 +4,6 @@ options:
   createIntermediateGroups: true
 
 packages:
-  HotKey:
-    url: https://github.com/soffes/HotKey
-    from: "0.2.0"
   Highlightr:
     url: https://github.com/raspu/Highlightr
     from: "2.1.2"
@@ -19,7 +16,6 @@ targets:
     sources:
       - JotKit
     dependencies:
-      - package: HotKey
       - package: Highlightr
     settings:
       base:
