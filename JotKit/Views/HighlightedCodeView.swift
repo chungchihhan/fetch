@@ -7,17 +7,16 @@ struct HighlightedCodeView: NSViewRepresentable {
     var isEditing: Bool
     var focusCode: Bool = false
     var onCodeChange: ((String) -> Void)?
+    var onCursorFirstLine: ((Bool) -> Void)?
 
-    private let highlightr: Highlightr = {
-        let h = Highlightr()!
-        h.setTheme(to: "atom-one-dark")
+    private static let highlightr: Highlightr? = {
+        let h = Highlightr()
+        h?.setTheme(to: "atom-one-dark")
         return h
     }()
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
         let textView = NSTextView()
-
         textView.isRichText = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -25,26 +24,63 @@ struct HighlightedCodeView: NSViewRepresentable {
         textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.delegate = context.coordinator
 
+        // No line-wrapping
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                              height: CGFloat.greatestFiniteMagnitude)
+        textView.isHorizontallyResizable = true
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = []
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                  height: CGFloat.greatestFiniteMagnitude)
+
+        let scrollView = NSScrollView()
         scrollView.documentView = textView
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
+        scrollView.horizontalScrollElasticity = .none
+        scrollView.verticalScrollElasticity = .none
 
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
-        context.coordinator.onCodeChange = onCodeChange   // keep callback fresh
+        let coord = context.coordinator
+        coord.onCodeChange = onCodeChange
         textView.isEditable = isEditing
-        if focusCode, isEditing, textView.window?.firstResponder !== textView {
-            textView.window?.makeFirstResponder(textView)
+
+        let wasCodeFocused = coord.wasCodeFocused
+        coord.wasCodeFocused = focusCode
+
+        // Update cursor-first-line callback reference
+        coord.onCursorFirstLine = onCursorFirstLine
+
+        // Focus / unfocus the NSTextView
+        if focusCode && isEditing && textView.window?.firstResponder !== textView {
+            // Defer to next run loop so the view is fully laid out before requesting focus
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+                textView.setSelectedRange(NSRange(location: 0, length: 0))
+                coord.onCursorFirstLine?(true)
+            }
+        } else if !focusCode && wasCodeFocused && isEditing {
+            if textView.window?.firstResponder === textView {
+                textView.window?.makeFirstResponder(nil)
+            }
         }
 
-        // Only re-highlight if code changed to avoid cursor jump during editing
-        if textView.string != code {
-            if let highlighted = highlightr.highlight(code, as: language) {
+        let justStoppedEditing = coord.wasEditing && !isEditing
+        coord.wasEditing = isEditing
+
+        if isEditing {
+            if textView.string != code { textView.string = code }
+        } else if justStoppedEditing || textView.string != code {
+            if let highlighted = Self.highlightr?.highlight(code, as: language) {
                 textView.textStorage?.setAttributedString(highlighted)
             } else {
                 textView.string = code
@@ -52,16 +88,29 @@ struct HighlightedCodeView: NSViewRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onCodeChange: onCodeChange)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onCodeChange: ((String) -> Void)?
-        init(onCodeChange: ((String) -> Void)?) { self.onCodeChange = onCodeChange }
+        var onCursorFirstLine: ((Bool) -> Void)?
+        var wasEditing: Bool = false
+        var wasCodeFocused: Bool = false
+
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             onCodeChange?(tv.string)
+            reportFirstLine(tv)
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let tv = notification.object as? NSTextView else { return }
+            reportFirstLine(tv)
+        }
+
+        private func reportFirstLine(_ tv: NSTextView) {
+            let cursorPos = tv.selectedRange().location
+            let isFirst = !tv.string.prefix(cursorPos).contains("\n")
+            onCursorFirstLine?(isFirst)
         }
     }
 }

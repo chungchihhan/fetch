@@ -6,6 +6,7 @@ import AppKit
 private final class ListNavState {
     var focusedIndex: Int? = nil
     var editStep: Int = 0        // 0=browse, 1=title edit, 2=code edit
+    var cursorOnFirstLine: Bool = true
     var isEditing: Bool { editStep > 0 }
 }
 
@@ -35,7 +36,8 @@ struct SnippetListView: View {
                                     isFocused: nav.focusedIndex == i,
                                     editStep: nav.focusedIndex == i ? nav.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
-                                    onCodeChange: { store.tabs[store.activeTab][i].code = $0 }
+                                    onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
+                                    onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
                                 )
                                 .id(i)
                                 .onTapGesture { nav.focusedIndex = i }
@@ -80,85 +82,112 @@ struct SnippetListView: View {
         { event in
             let snippets = store.tabs[store.activeTab]
             let tab = store.activeTab
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-            // --- Edit mode ---
+            func enterEdit() {
+                if nav.focusedIndex == nil, !snippets.isEmpty { nav.focusedIndex = 0 }
+                guard nav.focusedIndex != nil else { return }
+                nav.editStep = 1
+                NotificationCenter.default.post(name: .editModeChanged, object: true)
+            }
+
+            func exitEdit(copy: Bool) {
+                if copy, let i = nav.focusedIndex, i < snippets.count {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                }
+                nav.editStep = 0
+                store.save(tab: tab)
+                NotificationCenter.default.post(name: .editModeChanged, object: false)
+            }
+
+            // ─── Edit mode ───────────────────────────────────────────────────
             if nav.editStep > 0 {
                 switch event.keyCode {
-                case 36: // Enter — cycle to next step
-                    if nav.editStep == 1 {
-                        nav.editStep = 2        // title → code
+
+                case 14 where flags == .command:    // ⌘E — save and exit
+                    exitEdit(copy: false); return true
+
+                case 36:                            // Enter / Shift+Enter
+                    if nav.editStep == 2 && flags.contains(.shift) {
+                        return false                // Shift+Enter in code → newline (pass through)
+                    }
+                    exitEdit(copy: true)            // Enter → save + exit + copy
+                    return true
+
+                case 53:                            // Esc — save and exit (no copy)
+                    exitEdit(copy: false); return true
+
+                case 48:                            // Tab / Shift+Tab — navigate fields
+                    if flags.contains(.shift) {
+                        if nav.editStep == 2 { nav.editStep = 1 }   // code → title
                     } else {
-                        nav.editStep = 0        // code → browse, save
-                        store.save(tab: tab)
-                        NotificationCenter.default.post(name: .editModeChanged, object: false)
+                        if nav.editStep == 1 { nav.editStep = 2 }   // title → code
                     }
                     return true
-                case 53: // Esc — save and exit
-                    nav.editStep = 0
-                    store.save(tab: tab)
-                    NotificationCenter.default.post(name: .editModeChanged, object: false)
-                    return true
-                case 125, 126: // ↓↑ — save, exit, move focus
-                    nav.editStep = 0
-                    store.save(tab: tab)
-                    NotificationCenter.default.post(name: .editModeChanged, object: false)
-                    let delta = event.keyCode == 125 ? 1 : -1
-                    if !snippets.isEmpty {
-                        let current = nav.focusedIndex ?? (delta > 0 ? -1 : snippets.count)
-                        nav.focusedIndex = max(0, min(snippets.count - 1, current + delta))
+
+                case 125:                           // ↓
+                    if nav.editStep == 1 { nav.editStep = 2; return true } // title → code
+                    return false                    // in code: pass through (NSTextView navigates)
+
+                case 126:                           // ↑
+                    if nav.editStep == 1 { return true }          // in title: do nothing
+                    if nav.editStep == 2 && nav.cursorOnFirstLine { // in code first line → title
+                        nav.editStep = 1; return true
                     }
-                    return true
-                case 48: // Tab — pass through to text fields
-                    return false
+                    return false                    // in code: pass through
+
                 default:
-                    return nav.editStep == 1 ? false : false // let typing through
+                    return false                    // let typing reach text fields
                 }
             }
 
-            // --- Browse mode ---
+            // ─── Browse mode ─────────────────────────────────────────────────
             switch event.keyCode {
-            case 125: // ↓
+
+            case 14 where flags == .command:        // ⌘E — enter edit mode
+                enterEdit(); return true
+
+            case 125:                               // ↓ — next snippet
                 if !snippets.isEmpty {
                     let current = nav.focusedIndex ?? -1
                     nav.focusedIndex = max(0, min(snippets.count - 1, current + 1))
                 }
                 return true
-            case 126: // ↑
+
+            case 126:                               // ↑ — prev snippet
                 if !snippets.isEmpty {
                     let current = nav.focusedIndex ?? snippets.count
                     nav.focusedIndex = max(0, min(snippets.count - 1, current - 1))
                 }
                 return true
-            case 36: // Enter — start editing (title)
-                if nav.focusedIndex == nil, !snippets.isEmpty { nav.focusedIndex = 0 }
-                if nav.focusedIndex != nil {
-                    nav.editStep = 1
-                    NotificationCenter.default.post(name: .editModeChanged, object: true)
-                }
-                return true
-            case 53: // Esc — close popover
+
+            case 53:                               // Esc — close popover
                 NotificationCenter.default.post(name: NSPopover.willCloseNotification, object: nil)
                 NSApp.hide(nil)
                 return true
-            case 8 where event.modifierFlags.contains(.command): // ⌘C
+
+            case 8 where flags.contains(.command): // ⌘C — copy code
                 if let i = nav.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                 }
                 return true
-            case 45 where event.modifierFlags.contains(.command): // ⌘N
+
+            case 45 where flags.contains(.command): // ⌘N — new snippet
                 store.addSnippet()
                 nav.focusedIndex = store.tabs[tab].count - 1
-                nav.editStep = 1
-                NotificationCenter.default.post(name: .editModeChanged, object: true)
+                enterEdit()
                 return true
-            case 2 where event.modifierFlags.contains(.command): // ⌘D
+
+            case 2 where flags.contains(.command): // ⌘D — delete
                 if let i = nav.focusedIndex, i < snippets.count {
                     store.deleteSnippet(id: snippets[i].id, tab: tab)
                     let remaining = store.tabs[tab]
                     nav.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
                 }
                 return true
+
             default:
                 return false
             }

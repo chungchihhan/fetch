@@ -7,8 +7,8 @@ struct HintBarView: View {
         HStack(spacing: 0) {
             Spacer()
             Text(isEditing
-                 ? "↵ next field · Esc save & exit"
-                 : "↑↓ navigate · ↵ edit · ⌘C copy · ⌘N new · ⌘D delete")
+                 ? "Tab/⇧Tab fields · ↵ save+copy · Esc save · ⇧↵ newline"
+                 : "↑↓ navigate · ⌘E edit · ⌘C copy · ⌘N new · ⌘D delete")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.25))
             Spacer()
