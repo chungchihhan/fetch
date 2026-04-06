@@ -44,9 +44,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.togglePanel()
                 }
         )
-        // Remove the popover arrow
-        popover.setValue(false, forKeyPath: "shouldHaveArrow")
-
         // Close popover on click outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.popover.isShown else { return }
