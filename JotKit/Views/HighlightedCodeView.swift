@@ -17,11 +17,18 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
+        let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.isRichText = false
         textView.isSelectable = true
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 2, height: 2)
-        textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.font = font
+        textView.textColor = .white
+        textView.insertionPointColor = .white
+        textView.typingAttributes = [
+            .foregroundColor: NSColor.white,
+            .font: font
+        ]
         textView.delegate = context.coordinator
 
         // No line-wrapping
@@ -78,12 +85,22 @@ struct HighlightedCodeView: NSViewRepresentable {
         coord.wasEditing = isEditing
 
         if isEditing {
-            if textView.string != code { textView.string = code }
+            if textView.string != code {
+                textView.string = code
+                // Restore white — setting .string strips all attributes
+                textView.textColor = .white
+            }
         } else if justStoppedEditing || textView.string != code {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
-                textView.textStorage?.setAttributedString(highlighted)
+                // Keep syntax colors but force our font so edit/browse look identical
+                let result = NSMutableAttributedString(attributedString: highlighted)
+                let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+                result.addAttribute(.font, value: font,
+                                    range: NSRange(location: 0, length: result.length))
+                textView.textStorage?.setAttributedString(result)
             } else {
                 textView.string = code
+                textView.textColor = .white
             }
         }
     }
