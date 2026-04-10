@@ -129,7 +129,7 @@ struct SnippetListView: View {
                     if nav.editStep == 2 && flags.contains(.shift) {
                         return false                // Shift+Enter in code → newline (pass through)
                     }
-                    exitEdit(copy: true)            // Enter → save + exit + copy
+                    exitEdit(copy: false)           // Enter → save + exit (no copy)
                     return true
 
                 case 53:                            // Esc — save and exit (no copy)
@@ -161,6 +161,14 @@ struct SnippetListView: View {
 
             // ─── Browse mode ─────────────────────────────────────────────────
             switch event.keyCode {
+
+            case 36:                                // Enter — copy focused snippet code
+                if let i = nav.focusedIndex, i < snippets.count {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                    postToast("Copied")
+                }
+                return true
 
             case 14 where flags == .command:        // ⌘E — enter edit mode
                 enterEdit(); return true
