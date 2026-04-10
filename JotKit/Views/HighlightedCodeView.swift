@@ -17,10 +17,10 @@ struct HighlightedCodeView: NSViewRepresentable {
     private var theme: String { colorScheme == .dark ? "atom-one-dark" : "atom-one-light" }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView()
+        let textView = PointerCursorTextView()
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.isRichText = false
-        textView.isSelectable = true
+        textView.isSelectable = false
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 2, height: 2)
         textView.font = font
@@ -67,7 +67,11 @@ struct HighlightedCodeView: NSViewRepresentable {
 
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
-        textView.isEditable = isEditing
+        if textView.isEditable != isEditing {
+            textView.isEditable = isEditing
+            textView.isSelectable = isEditing
+            textView.window?.invalidateCursorRects(for: textView)
+        }
 
         let wasCodeFocused = coord.wasCodeFocused
         coord.wasCodeFocused = focusCode
@@ -142,6 +146,24 @@ struct HighlightedCodeView: NSViewRepresentable {
             let cursorPos = tv.selectedRange().location
             let isFirst = !tv.string.prefix(cursorPos).contains("\n")
             onCursorFirstLine?(isFirst)
+        }
+    }
+}
+
+private final class PointerCursorTextView: NSTextView {
+    override func resetCursorRects() {
+        if isEditable {
+            super.resetCursorRects()
+        } else {
+            addCursorRect(bounds, cursor: .pointingHand)
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if isEditable {
+            super.cursorUpdate(with: event)
+        } else {
+            NSCursor.pointingHand.set()
         }
     }
 }

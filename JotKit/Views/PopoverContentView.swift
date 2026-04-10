@@ -78,10 +78,8 @@ struct ResizeHandle: View {
                 .frame(width: 36, height: 3)
         }
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovering = hovering
-            if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
-        }
+        .onHover { isHovering = $0 }
+        .overlay(ResizeCursorView())
         .gesture(
             DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { value in
@@ -93,6 +91,18 @@ struct ResizeHandle: View {
                 .onEnded { _ in dragStartHeight = nil }
         )
     }
+}
+
+private struct ResizeCursorView: NSViewRepresentable {
+    func makeNSView(context: Context) -> ResizeCursorNSView { ResizeCursorNSView() }
+    func updateNSView(_ nsView: ResizeCursorNSView, context: Context) {}
+}
+
+final class ResizeCursorNSView: NSView {
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .resizeUpDown)
+    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // NSVisualEffectView wrapper for frosted glass

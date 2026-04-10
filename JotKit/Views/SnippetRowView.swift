@@ -66,6 +66,7 @@ struct SnippetRowView: View {
     var onCursorFirstLine: ((Bool) -> Void)? = nil
 
     private var isEditing: Bool { editStep > 0 }
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -124,6 +125,16 @@ struct SnippetRowView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 1)
         )
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                isHovering = true
+                if !isEditing { NSCursor.pointingHand.set() }
+            case .ended:
+                isHovering = false
+                NSCursor.arrow.set()
+            }
+        }
     }
 
     // 1–5 visible lines, then vertical scroll
@@ -136,12 +147,15 @@ struct SnippetRowView: View {
     private var backgroundFill: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.12) }
         if isFocused { return Color(hex: "#78c9ab").opacity(0.16) }
+        if isHovering { return Color.primary.opacity(0.07) }
         return .clear
     }
 
     private var borderColor: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.75) }
         if isFocused { return Color(hex: "#78c9ab").opacity(0.70) }
+        if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
     }
 }
+
