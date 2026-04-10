@@ -26,7 +26,7 @@ struct HintBarView: View {
                 .padding(.trailing, 12)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 10)
         .overlay(Divider(), alignment: .top)
     }
 }

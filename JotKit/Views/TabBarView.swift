@@ -69,10 +69,10 @@ private struct TabButtonBody: View {
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(isActive ? Color(hex: "#78c9ab").opacity(0.15) : (isHovering ? Color.primary.opacity(0.07) : .clear))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 10)
                             .stroke(isActive ? Color(hex: "#78c9ab").opacity(0.40) : (isHovering ? Color.primary.opacity(0.18) : .clear), lineWidth: 1)
                     )
             )
