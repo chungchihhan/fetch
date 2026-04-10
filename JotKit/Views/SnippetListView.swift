@@ -34,7 +34,7 @@ struct SnippetListView: View {
             if snippets.isEmpty {
                 Text("Press ⌘N to add a snippet")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.black.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollViewReader { proxy in

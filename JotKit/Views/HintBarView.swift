@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HintBarView: View {
     var isEditing: Bool
+    var showPanelButton: Bool = true
 
     var body: some View {
         HStack(spacing: 0) {
@@ -10,18 +11,20 @@ struct HintBarView: View {
                  ? "Tab/⇧Tab fields · ↵ save+copy · Esc save · ⇧↵ newline"
                  : "↑↓ navigate · ⌘E edit · ⌘C copy · ⌘N new · ⌘D delete")
                 .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.black.opacity(0.45))
+                .foregroundStyle(.primary.opacity(0.45))
             Spacer()
-            Button {
-                NotificationCenter.default.post(name: .togglePanel, object: nil)
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.black.opacity(0.40))
+            if showPanelButton {
+                Button {
+                    NotificationCenter.default.post(name: .togglePanel, object: nil)
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.primary.opacity(0.40))
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("p", modifiers: .command)
+                .padding(.trailing, 12)
             }
-            .buttonStyle(.plain)
-            .keyboardShortcut("p", modifiers: .command)
-            .padding(.trailing, 12)
         }
         .padding(.vertical, 6)
         .overlay(Divider(), alignment: .top)

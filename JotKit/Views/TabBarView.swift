@@ -50,7 +50,7 @@ struct TabButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .black.opacity(0.55))
+            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .primary.opacity(0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
             .background(

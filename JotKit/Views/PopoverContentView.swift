@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PopoverContentView: View {
+    var isPanel: Bool = false
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
     @AppStorage("jotkitHeight") private var height: Double = 300
@@ -12,6 +13,10 @@ struct PopoverContentView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                if isPanel {
+                    PanelTitleBar()
+                }
+
                 TabBarView(activeTab: Binding(
                     get: { store.activeTab },
                     set: { store.activeTab = $0 }
@@ -19,7 +24,7 @@ struct PopoverContentView: View {
 
                 SnippetListView()
 
-                HintBarView(isEditing: isEditing)
+                HintBarView(isEditing: isEditing, showPanelButton: !isPanel)
             }
         }
         .frame(width: 380, height: CGFloat(height))
@@ -28,6 +33,35 @@ struct PopoverContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .editModeChanged)) { note in
             isEditing = note.object as? Bool ?? false
         }
+    }
+}
+
+struct PanelTitleBar: View {
+    var body: some View {
+        HStack {
+            // Drag affordance dots
+            HStack(spacing: 4) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Circle()
+                        .fill(Color.primary.opacity(0.18))
+                        .frame(width: 3, height: 3)
+                }
+            }
+            Spacer()
+            // Back to popover
+            Button {
+                NotificationCenter.default.post(name: .togglePanel, object: nil)
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.primary.opacity(0.45))
+            }
+            .buttonStyle(.plain)
+            .help("Back to popover")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .overlay(Divider(), alignment: .bottom)
     }
 }
 
@@ -40,7 +74,7 @@ struct ResizeHandle: View {
         ZStack {
             Color.clear.frame(height: 8)
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color.white.opacity(isHovering ? 0.25 : 0.10))
+                .fill(Color.primary.opacity(isHovering ? 0.25 : 0.12))
                 .frame(width: 36, height: 3)
         }
         .contentShape(Rectangle())

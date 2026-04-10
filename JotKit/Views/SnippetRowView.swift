@@ -24,7 +24,7 @@ private struct EndCursorTextField: NSViewRepresentable {
         field.drawsBackground = false
         field.backgroundColor = .clear
         field.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        field.textColor = NSColor.black
+        field.textColor = NSColor.labelColor
         field.focusRingType = .none
         field.placeholderString = ""
         field.delegate = context.coordinator
@@ -84,7 +84,7 @@ struct SnippetRowView: View {
                 } else {
                     Text(snippet.title.isEmpty ? "Untitled" : snippet.title)
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.black.opacity(isFocused ? 0.90 : 0.60))
+                        .foregroundStyle(.primary.opacity(isFocused ? 0.90 : 0.60))
                     Spacer(minLength: 0)
                     // Copy icon — visible when row is focused in browse mode
                     if isFocused {
@@ -95,7 +95,7 @@ struct SnippetRowView: View {
                         } label: {
                             Image(systemName: "doc.on.doc")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.black.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                         }
                         .buttonStyle(.plain)
                         .help("Copy code")
@@ -114,7 +114,7 @@ struct SnippetRowView: View {
             )
             .frame(height: codeViewHeight)
             .padding(7)
-            .background(Color.black.opacity(0.05))
+            .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))
         }
         .padding(8)
@@ -142,6 +142,6 @@ struct SnippetRowView: View {
     private var borderColor: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.75) }
         if isFocused { return Color(hex: "#78c9ab").opacity(0.70) }
-        return Color.black.opacity(0.10)
+        return Color.primary.opacity(0.10)
     }
 }

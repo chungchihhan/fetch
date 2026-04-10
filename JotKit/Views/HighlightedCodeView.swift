@@ -9,11 +9,12 @@ struct HighlightedCodeView: NSViewRepresentable {
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
 
-    private static let highlightr: Highlightr? = {
-        let h = Highlightr()
-        h?.setTheme(to: "atom-one-light")
-        return h
-    }()
+    @Environment(\.colorScheme) private var colorScheme
+
+    private static let highlightr: Highlightr? = Highlightr()
+    private static var currentTheme: String = ""
+
+    private var theme: String { colorScheme == .dark ? "atom-one-dark" : "atom-one-light" }
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
@@ -23,10 +24,10 @@ struct HighlightedCodeView: NSViewRepresentable {
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 2, height: 2)
         textView.font = font
-        textView.textColor = .black
-        textView.insertionPointColor = .black
+        textView.textColor = .labelColor
+        textView.insertionPointColor = .labelColor
         textView.typingAttributes = [
-            .foregroundColor: NSColor.black,
+            .foregroundColor: NSColor.labelColor,
             .font: font
         ]
         textView.delegate = context.coordinator
@@ -57,6 +58,13 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        // Sync highlight theme with current appearance
+        if Self.currentTheme != theme {
+            Self.highlightr?.setTheme(to: theme)
+            Self.currentTheme = theme
+        }
+
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
         textView.isEditable = isEditing
@@ -94,7 +102,7 @@ struct HighlightedCodeView: NSViewRepresentable {
             if textView.string != code {
                 textView.string = code
                 // Restore white — setting .string strips all attributes
-                textView.textColor = .black
+                textView.textColor = .labelColor
             }
         } else if justStoppedEditing || textView.string != code {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
@@ -106,7 +114,7 @@ struct HighlightedCodeView: NSViewRepresentable {
                 textView.textStorage?.setAttributedString(result)
             } else {
                 textView.string = code
-                textView.textColor = .black
+                textView.textColor = .labelColor
             }
         }
     }

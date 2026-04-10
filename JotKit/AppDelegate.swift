@@ -38,11 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .applicationDefined
         popover.animates = false
         popover.contentViewController = NSHostingController(
-            rootView: PopoverContentView()
-                .environment(store)
-                .onReceive(NotificationCenter.default.publisher(for: .togglePanel)) { [weak self] _ in
-                    self?.togglePanel()
-                }
+            rootView: PopoverContentView().environment(store)
         )
         // Close popover on click outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -56,6 +52,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             selector: #selector(popoverWillClose),
             name: NSPopover.willCloseNotification,
             object: popover
+        )
+
+        // Single observer for panel toggle — avoids double-fire from multiple hosting controllers
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTogglePanel),
+            name: .togglePanel,
+            object: nil
         )
 
         // Resize popover/panel when user drags handle
@@ -81,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc func handleTogglePanel() { togglePanel() }
+
     @objc func popoverWillClose() {
         store.saveAll()
     }
@@ -101,16 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel?.close()
             panel = nil
             isPanel = false
+            DispatchQueue.main.async { self.togglePopover() }
         } else {
             // Detach to floating panel
             popover.performClose(nil)
             isPanel = true
             let hosting = NSHostingController(
-                rootView: PopoverContentView()
-                    .environment(store)
-                    .onReceive(NotificationCenter.default.publisher(for: .togglePanel)) { [weak self] _ in
-                        self?.togglePanel()
-                    }
+                rootView: PopoverContentView(isPanel: true).environment(store)
             )
             let storedHeight = UserDefaults.standard.double(forKey: "jotkitHeight")
             let panelHeight = storedHeight > 0 ? storedHeight : 300
@@ -132,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let y = screen.visibleFrame.maxY - panelHeight - 10
                 p.setFrameOrigin(NSPoint(x: x, y: y))
             }
+            p.isMovableByWindowBackground = true
             p.makeKeyAndOrderFront(nil)
             self.panel = p
         }
