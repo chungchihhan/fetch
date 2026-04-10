@@ -50,7 +50,15 @@ struct SnippetListView: View {
                                     onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
                                 )
                                 .id(i)
-                                .onTapGesture { nav.setFocus(i, tab: store.activeTab) }
+                                .onTapGesture {
+                                    nav.setFocus(i, tab: store.activeTab)
+                                    guard nav.editStep == 0 else { return }
+                                    let snippets = store.tabs[store.activeTab]
+                                    guard i < snippets.count else { return }
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                                    postToast("Copied")
+                                }
                             }
                         }
                         .padding(.horizontal, 12)
