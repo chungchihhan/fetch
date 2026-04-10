@@ -13,6 +13,12 @@ struct TabBarView: View {
                     Button("⌘\(i + 1)") { activeTab = i }
                     .buttonStyle(TabButtonStyle(isActive: activeTab == i))
                     .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active: NSCursor.pointingHand.set()
+                        case .ended:  NSCursor.arrow.set()
+                        }
+                    }
                 }
             }
 
@@ -46,21 +52,31 @@ struct TabBarView: View {
 
 struct TabButtonStyle: ButtonStyle {
     var isActive: Bool
-
     func makeBody(configuration: Configuration) -> some View {
+        TabButtonBody(configuration: configuration, isActive: isActive)
+    }
+}
+
+private struct TabButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    var isActive: Bool
+    @State private var isHovering = false
+
+    var body: some View {
         configuration.label
             .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .primary.opacity(0.55))
+            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .primary.opacity(isHovering ? 0.80 : 0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isActive ? Color(hex: "#78c9ab").opacity(0.15) : .clear)
+                    .fill(isActive ? Color(hex: "#78c9ab").opacity(0.15) : (isHovering ? Color.primary.opacity(0.07) : .clear))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(isActive ? Color(hex: "#78c9ab").opacity(0.40) : .clear, lineWidth: 1)
+                            .stroke(isActive ? Color(hex: "#78c9ab").opacity(0.40) : (isHovering ? Color.primary.opacity(0.18) : .clear), lineWidth: 1)
                     )
             )
+            .onHover { isHovering = $0 }
     }
 }
 
