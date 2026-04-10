@@ -3,6 +3,7 @@ import SwiftUI
 struct PopoverContentView: View {
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
+    @AppStorage("jotkitHeight") private var height: Double = 300
 
     var body: some View {
         ZStack {
@@ -21,12 +22,42 @@ struct PopoverContentView: View {
                 HintBarView(isEditing: isEditing)
             }
         }
-        .frame(width: 380, height: 300)
+        .frame(width: 380, height: CGFloat(height))
+        .overlay(alignment: .bottom) { ResizeHandle(height: $height) }
         .background(.clear)
-        // Propagate edit state up for HintBarView
         .onReceive(NotificationCenter.default.publisher(for: .editModeChanged)) { note in
             isEditing = note.object as? Bool ?? false
         }
+    }
+}
+
+struct ResizeHandle: View {
+    @Binding var height: Double
+    @State private var dragStartHeight: Double? = nil
+    @State private var isHovering = false
+
+    var body: some View {
+        ZStack {
+            Color.clear.frame(height: 8)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.white.opacity(isHovering ? 0.25 : 0.10))
+                .frame(width: 36, height: 3)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    if dragStartHeight == nil { dragStartHeight = height }
+                    let proposed = (dragStartHeight ?? height) + Double(value.translation.height)
+                    height = max(200, min(700, proposed))
+                    NotificationCenter.default.post(name: .heightChanged, object: CGFloat(height))
+                }
+                .onEnded { _ in dragStartHeight = nil }
+        )
     }
 }
 

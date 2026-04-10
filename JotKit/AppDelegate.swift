@@ -57,6 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSPopover.willCloseNotification,
             object: popover
         )
+
+        // Resize popover/panel when user drags handle
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHeightChanged),
+            name: .heightChanged,
+            object: nil
+        )
     }
 
     @objc func togglePopover() {
@@ -77,6 +85,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.saveAll()
     }
 
+    @objc func handleHeightChanged(_ note: Notification) {
+        guard let height = note.object as? CGFloat else { return }
+        let size = NSSize(width: 380, height: height)
+        if !isPanel {
+            popover.contentSize = size
+        } else {
+            panel?.setContentSize(size)
+        }
+    }
+
     func togglePanel() {
         if isPanel {
             // Switch back to popover
@@ -94,8 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.togglePanel()
                     }
             )
+            let storedHeight = UserDefaults.standard.double(forKey: "jotkitHeight")
+            let panelHeight = storedHeight > 0 ? storedHeight : 300
             let p = NSPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 380, height: 300),
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: panelHeight),
                 styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
                 backing: .buffered,
                 defer: false
@@ -109,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Pin to top-right
             if let screen = NSScreen.main {
                 let x = screen.visibleFrame.maxX - 390
-                let y = screen.visibleFrame.maxY - 310
+                let y = screen.visibleFrame.maxY - panelHeight - 10
                 p.setFrameOrigin(NSPoint(x: x, y: y))
             }
             p.makeKeyAndOrderFront(nil)
@@ -123,5 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension Notification.Name {
-    static let togglePanel = Notification.Name("JotKitTogglePanel")
+    static let togglePanel   = Notification.Name("JotKitTogglePanel")
+    static let heightChanged = Notification.Name("JotKitHeightChanged")
 }

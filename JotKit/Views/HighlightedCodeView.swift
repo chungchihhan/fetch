@@ -11,7 +11,7 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     private static let highlightr: Highlightr? = {
         let h = Highlightr()
-        h?.setTheme(to: "atom-one-dark")
+        h?.setTheme(to: "atom-one-light")
         return h
     }()
 
@@ -23,10 +23,10 @@ struct HighlightedCodeView: NSViewRepresentable {
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 2, height: 2)
         textView.font = font
-        textView.textColor = .white
-        textView.insertionPointColor = .white
+        textView.textColor = .black
+        textView.insertionPointColor = .black
         textView.typingAttributes = [
-            .foregroundColor: NSColor.white,
+            .foregroundColor: NSColor.black,
             .font: font
         ]
         textView.delegate = context.coordinator
@@ -44,8 +44,8 @@ struct HighlightedCodeView: NSViewRepresentable {
 
         let scrollView = NSScrollView()
         scrollView.documentView = textView
-        scrollView.hasHorizontalScroller = true
-        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.hasVerticalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
@@ -94,7 +94,7 @@ struct HighlightedCodeView: NSViewRepresentable {
             if textView.string != code {
                 textView.string = code
                 // Restore white — setting .string strips all attributes
-                textView.textColor = .white
+                textView.textColor = .black
             }
         } else if justStoppedEditing || textView.string != code {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
@@ -106,7 +106,7 @@ struct HighlightedCodeView: NSViewRepresentable {
                 textView.textStorage?.setAttributedString(result)
             } else {
                 textView.string = code
-                textView.textColor = .white
+                textView.textColor = .black
             }
         }
     }

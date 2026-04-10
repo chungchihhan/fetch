@@ -2,20 +2,45 @@ import SwiftUI
 
 struct TabBarView: View {
     @Binding var activeTab: Int
+    @State private var toastMessage: String? = nil
+    @State private var toastTask: Task<Void, Never>? = nil
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<6, id: \.self) { i in
-                Button("⌘\(i + 1)") { activeTab = i }
-                .buttonStyle(TabButtonStyle(isActive: activeTab == i))
-                .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
+        HStack(spacing: 0) {
+            // Tabs — left-aligned
+            HStack(spacing: 4) {
+                ForEach(0..<6, id: \.self) { i in
+                    Button("⌘\(i + 1)") { activeTab = i }
+                    .buttonStyle(TabButtonStyle(isActive: activeTab == i))
+                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
+                }
+            }
+
+            Spacer()
+
+            // Toast — top right
+            if let msg = toastMessage {
+                Text(msg)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#78c9ab"))
+                    .transition(.opacity)
+                    .padding(.trailing, 12)
             }
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 8)
-        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.15), value: toastMessage)
         .overlay(Divider(), alignment: .bottom)
+        .onReceive(NotificationCenter.default.publisher(for: .toastMessage)) { note in
+            toastMessage = note.object as? String
+            toastTask?.cancel()
+            toastTask = Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard !Task.isCancelled else { return }
+                await MainActor.run { toastMessage = nil }
+            }
+        }
     }
 }
 
@@ -25,15 +50,15 @@ struct TabButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(isActive ? Color(hex: "#89b4fa") : .white.opacity(0.28))
+            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .black.opacity(0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isActive ? Color(hex: "#89b4fa").opacity(0.18) : .clear)
+                    .fill(isActive ? Color(hex: "#78c9ab").opacity(0.15) : .clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(isActive ? Color(hex: "#89b4fa").opacity(0.35) : .clear, lineWidth: 1)
+                            .stroke(isActive ? Color(hex: "#78c9ab").opacity(0.40) : .clear, lineWidth: 1)
                     )
             )
     }

@@ -34,7 +34,7 @@ struct SnippetListView: View {
             if snippets.isEmpty {
                 Text("Press ⌘N to add a snippet")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(.black.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollViewReader { proxy in
@@ -109,6 +109,9 @@ struct SnippetListView: View {
                 if copy, let i = nav.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                    postToast("Copied")
+                } else {
+                    postToast("Saved")
                 }
                 nav.editStep = 0
                 store.save(tab: tab)
@@ -185,6 +188,7 @@ struct SnippetListView: View {
                 if let i = nav.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                    postToast("Copied")
                 }
                 return true
 
@@ -199,6 +203,7 @@ struct SnippetListView: View {
                     store.deleteSnippet(id: snippets[i].id, tab: tab)
                     let remaining = store.tabs[tab]
                     nav.setFocus(remaining.isEmpty ? nil : max(0, i - 1), tab: tab)
+                    postToast("Deleted")
                 }
                 return true
 
@@ -247,4 +252,9 @@ final class KeyCatchingNSView: NSView {
 extension Notification.Name {
     static let editModeChanged = Notification.Name("JotKitEditModeChanged")
     static let popoverDidOpen  = Notification.Name("JotKitPopoverDidOpen")
+    static let toastMessage    = Notification.Name("JotKitToastMessage")
+}
+
+private func postToast(_ message: String) {
+    NotificationCenter.default.post(name: .toastMessage, object: message)
 }
