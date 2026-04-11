@@ -223,6 +223,10 @@ struct SnippetListView: View {
                 }
                 return true
 
+            case 43 where flags.contains(.command): // ⌘, — open settings
+                NotificationCenter.default.post(name: .openSettings, object: nil)
+                return true
+
             default:
                 return false
             }
@@ -269,6 +273,7 @@ extension Notification.Name {
     static let editModeChanged = Notification.Name("JotKitEditModeChanged")
     static let popoverDidOpen  = Notification.Name("JotKitPopoverDidOpen")
     static let toastMessage    = Notification.Name("JotKitToastMessage")
+    static let openSettings    = Notification.Name("JotKitOpenSettings")
 }
 
 private func postToast(_ message: String) {

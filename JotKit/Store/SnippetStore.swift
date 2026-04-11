@@ -6,7 +6,7 @@ final class SnippetStore {
     var tabs: [[Snippet]] = Array(repeating: [], count: 6)
     var activeTab: Int = 0
 
-    private let storageDirectory: URL
+    private var storageDirectory: URL
 
     init(storageDirectory: URL = SnippetStore.defaultDirectory) {
         self.storageDirectory = storageDirectory
@@ -49,6 +49,19 @@ final class SnippetStore {
 
     func saveAll() {
         for i in 0..<6 { save(tab: i) }
+    }
+
+    func changeDirectory(to newURL: URL) {
+        saveAll()
+        try? FileManager.default.createDirectory(at: newURL, withIntermediateDirectories: true)
+        for i in 0..<6 {
+            let src = fileURL(for: i)
+            let dst = newURL.appendingPathComponent("tab\(i + 1).json")
+            guard FileManager.default.fileExists(atPath: src.path) else { continue }
+            try? FileManager.default.copyItem(at: src, to: dst)
+        }
+        storageDirectory = newURL
+        loadAll()
     }
 
     func load(tab: Int) {

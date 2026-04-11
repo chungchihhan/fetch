@@ -19,6 +19,7 @@
 		A1B1A0969A881D78F2B8801D /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AC95D3CE7E45AF50626FA7 /* PopoverContentView.swift */; };
 		A2842EEA5E1F3FCFD4CFD427 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0931F53B4B65275A8BBFFC /* AppDelegate.swift */; };
 		B4E691F326C6EBCB2C2323F5 /* SnippetRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 657A37E0CF75E763883D397A /* SnippetRowView.swift */; };
+		B80CC624E5A3BB8831FE19E1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018020E060D2D68C721EC869 /* SettingsView.swift */; };
 		CDC91FA5E9E387D4D94FAF82 /* SnippetListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 955C1CC4EEB4414F6381E36A /* SnippetListView.swift */; };
 		E808564DF7FEA3D87E0F73B8 /* Snippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D21F305BD154FDFDD1C106 /* Snippet.swift */; };
 /* End PBXBuildFile section */
@@ -34,6 +35,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		018020E060D2D68C721EC869 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0B5144094C9E47EE7FCB6AF0 /* HighlightedCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightedCodeView.swift; sourceTree = "<group>"; };
 		323A76E8AA9D94B7EFD2D1F2 /* JotKitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JotKitApp.swift; sourceTree = "<group>"; };
 		4050B3271298C37748D9A5E5 /* SnippetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetStore.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 				0B5144094C9E47EE7FCB6AF0 /* HighlightedCodeView.swift */,
 				E940A19EF2CF5C44B9471E0E /* HintBarView.swift */,
 				F2AC95D3CE7E45AF50626FA7 /* PopoverContentView.swift */,
+				018020E060D2D68C721EC869 /* SettingsView.swift */,
 				955C1CC4EEB4414F6381E36A /* SnippetListView.swift */,
 				657A37E0CF75E763883D397A /* SnippetRowView.swift */,
 				746DE5DBC3B1A955EA4C85F9 /* TabBarView.swift */,
@@ -228,6 +231,7 @@
 				A023CADD3D2EDA1BC1DFEDE8 /* HotKeyManager.swift in Sources */,
 				206FEBBE157DB60E89D309DC /* JotKitApp.swift in Sources */,
 				A1B1A0969A881D78F2B8801D /* PopoverContentView.swift in Sources */,
+				B80CC624E5A3BB8831FE19E1 /* SettingsView.swift in Sources */,
 				E808564DF7FEA3D87E0F73B8 /* Snippet.swift in Sources */,
 				CDC91FA5E9E387D4D94FAF82 /* SnippetListView.swift in Sources */,
 				B4E691F326C6EBCB2C2323F5 /* SnippetRowView.swift in Sources */,

@@ -67,6 +67,9 @@ struct SnippetRowView: View {
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
+    @State private var wrappedCodeHeight: CGFloat = 32
+    @AppStorage("jotkitCodeWrap") private var codeWrap: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -74,7 +77,7 @@ struct SnippetRowView: View {
             HStack(spacing: 4) {
                 Text("#")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Color(hex: "#78c9ab").opacity(isFocused ? 0.80 : 0.45))
+                    .foregroundStyle(Color(hex: "#78c9ab").opacity(isFocused ? 0.90 : (colorScheme == .dark ? 0.45 : 0.65)))
 
                 if isEditing {
                     EndCursorTextField(
@@ -110,10 +113,15 @@ struct SnippetRowView: View {
                 language: snippet.language,
                 isEditing: isEditing,
                 focusCode: editStep == 2,
+                wrapCode: codeWrap,
                 onCodeChange: isEditing ? onCodeChange : nil,
-                onCursorFirstLine: onCursorFirstLine
+                onCursorFirstLine: onCursorFirstLine,
+                onHeightChange: codeWrap ? { wrappedCodeHeight = $0 } : nil
             )
-            .frame(height: codeViewHeight)
+            .frame(height: codeWrap ? max(codeViewHeight, wrappedCodeHeight) : codeViewHeight)
+            .onChange(of: codeWrap) { _, wrap in
+                if wrap { wrappedCodeHeight = codeViewHeight }
+            }
             .padding(7)
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))

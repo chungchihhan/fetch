@@ -4,6 +4,15 @@ struct PopoverContentView: View {
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
     @AppStorage("jotkitHeight") private var height: Double = 300
+    @AppStorage("jotkitColorScheme") private var colorSchemeKey: String = "system"
+
+    private var preferredScheme: ColorScheme? {
+        switch colorSchemeKey {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -25,6 +34,7 @@ struct PopoverContentView: View {
         .frame(width: 380, height: CGFloat(height))
         .overlay(alignment: .bottom) { ResizeHandle(height: $height) }
         .background(.clear)
+        .preferredColorScheme(preferredScheme)
         .onReceive(NotificationCenter.default.publisher(for: .editModeChanged)) { note in
             isEditing = note.object as? Bool ?? false
         }

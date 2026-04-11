@@ -6,8 +6,10 @@ struct HighlightedCodeView: NSViewRepresentable {
     var language: String
     var isEditing: Bool
     var focusCode: Bool = false
+    var wrapCode: Bool = false
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
+    var onHeightChange: ((CGFloat) -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -59,14 +61,37 @@ struct HighlightedCodeView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
 
-        // Sync highlight theme with current appearance
+        // Sync highlight theme with current appearance (shared Highlightr singleton)
         if Self.currentTheme != theme {
             Self.highlightr?.setTheme(to: theme)
             Self.currentTheme = theme
         }
 
+        // Sync wrap mode
+        let currentlyWrapping = textView.textContainer?.widthTracksTextView ?? false
+        if currentlyWrapping != wrapCode {
+            textView.textContainer?.widthTracksTextView = wrapCode
+            textView.isHorizontallyResizable = !wrapCode
+            textView.autoresizingMask = wrapCode ? [.width] : []
+            if wrapCode {
+                let clipWidth = scrollView.contentView.bounds.width
+                let w = clipWidth > 0 ? clipWidth : 300
+                textView.frame.size.width = w
+                textView.textContainer?.size = NSSize(width: w,
+                                                      height: CGFloat.greatestFiniteMagnitude)
+            } else {
+                textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                                      height: CGFloat.greatestFiniteMagnitude)
+            }
+            textView.layoutManager?.invalidateLayout(
+                forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
+                actualCharacterRange: nil
+            )
+        }
+
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
+        coord.onHeightChange = onHeightChange
         if textView.isEditable != isEditing {
             textView.isEditable = isEditing
             textView.isSelectable = isEditing
@@ -108,7 +133,7 @@ struct HighlightedCodeView: NSViewRepresentable {
                 // Restore white — setting .string strips all attributes
                 textView.textColor = .labelColor
             }
-        } else if justStoppedEditing || textView.string != code {
+        } else if justStoppedEditing || textView.string != code || coord.renderedTheme != theme {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
                 // Keep syntax colors but force our font so edit/browse look identical
                 let result = NSMutableAttributedString(attributedString: highlighted)
@@ -116,9 +141,24 @@ struct HighlightedCodeView: NSViewRepresentable {
                 result.addAttribute(.font, value: font,
                                     range: NSRange(location: 0, length: result.length))
                 textView.textStorage?.setAttributedString(result)
+                coord.renderedTheme = theme
             } else {
                 textView.string = code
                 textView.textColor = .labelColor
+                coord.renderedTheme = theme
+            }
+        }
+
+        // Report natural height when wrapping so the parent can expand the frame
+        if wrapCode && !isEditing {
+            let onH = coord.onHeightChange
+            DispatchQueue.main.async {
+                guard let lm = textView.layoutManager,
+                      let tc = textView.textContainer else { return }
+                lm.ensureLayout(for: tc)
+                let used = lm.usedRect(for: tc)
+                let h = used.height + textView.textContainerInset.height * 2
+                onH?(max(16, h))
             }
         }
     }
@@ -130,6 +170,8 @@ struct HighlightedCodeView: NSViewRepresentable {
         var onCursorFirstLine: ((Bool) -> Void)?
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
+        var renderedTheme: String = ""
+        var onHeightChange: ((CGFloat) -> Void)?
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
