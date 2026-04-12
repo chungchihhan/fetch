@@ -34,7 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 380, height: 300)
+        let savedWidth  = UserDefaults.standard.double(forKey: "jotkitWidth")
+        let savedHeight = UserDefaults.standard.double(forKey: "jotkitHeight")
+        popover.contentSize = NSSize(
+            width:  savedWidth  > 0 ? savedWidth  : 380,
+            height: savedHeight > 0 ? savedHeight : 300
+        )
         popover.behavior = .applicationDefined
         popover.animates = false
         popover.contentViewController = NSHostingController(
@@ -54,6 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(handleHeightChanged),
             name: .heightChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWidthChanged),
+            name: .widthChanged,
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -121,7 +132,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func handleHeightChanged(_ note: Notification) {
         guard let height = note.object as? CGFloat else { return }
-        popover.contentSize = NSSize(width: 380, height: height)
+        popover.contentSize = NSSize(width: popover.contentSize.width, height: height)
+    }
+
+    @objc func handleWidthChanged(_ note: Notification) {
+        guard let width = note.object as? CGFloat else { return }
+        popover.contentSize = NSSize(width: width, height: popover.contentSize.height)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -131,4 +147,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension Notification.Name {
     static let heightChanged = Notification.Name("JotKitHeightChanged")
+    static let widthChanged  = Notification.Name("JotKitWidthChanged")
 }

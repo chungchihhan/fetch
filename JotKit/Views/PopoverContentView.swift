@@ -4,6 +4,7 @@ struct PopoverContentView: View {
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
     @AppStorage("jotkitHeight") private var height: Double = 300
+    @AppStorage("jotkitWidth") private var width: Double = 380
     @AppStorage("jotkitColorScheme") private var colorSchemeKey: String = "system"
 
     private var preferredScheme: ColorScheme? {
@@ -31,8 +32,9 @@ struct PopoverContentView: View {
                 HintBarView(isEditing: isEditing)
             }
         }
-        .frame(width: 380, height: CGFloat(height))
-        .overlay(alignment: .bottom) { ResizeHandle(height: $height) }
+        .frame(width: CGFloat(width), height: CGFloat(height))
+        .overlay(alignment: .bottom)   { ResizeHandle(height: $height) }
+        .overlay(alignment: .leading)  { ResizeWidthHandle(width: $width) }
         .background(.clear)
         .preferredColorScheme(preferredScheme)
         .onReceive(NotificationCenter.default.publisher(for: .editModeChanged)) { note in
@@ -40,6 +42,8 @@ struct PopoverContentView: View {
         }
     }
 }
+
+// ── Vertical (height) handle ────────────────────────────────────────────────
 
 struct ResizeHandle: View {
     @Binding var height: Double
@@ -61,7 +65,8 @@ struct ResizeHandle: View {
                 .onChanged { value in
                     if dragStartHeight == nil { dragStartHeight = height }
                     let proposed = (dragStartHeight ?? height) + Double(value.translation.height)
-                    height = max(200, min(700, proposed))
+                    let maxHeight = Double(NSScreen.main?.visibleFrame.height ?? 1200) - 40
+                    height = max(200, min(maxHeight, proposed))
                     NotificationCenter.default.post(name: .heightChanged, object: CGFloat(height))
                 }
                 .onEnded { _ in dragStartHeight = nil }
@@ -75,11 +80,65 @@ private struct ResizeCursorView: NSViewRepresentable {
 }
 
 final class ResizeCursorNSView: NSView {
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .resizeUpDown)
-    }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeUpDown) }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
+
+// ── Horizontal (width) handle ────────────────────────────────────────────────
+
+struct ResizeWidthHandle: View {
+    @Binding var width: Double
+    @State private var isHovering = false
+
+    var body: some View {
+        ZStack {
+            // Wider hit area
+            ResizeWidthDragView(width: $width)
+                .frame(width: 8)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.primary.opacity(isHovering ? 0.25 : 0.12))
+                .frame(width: 3, height: 36)
+                .allowsHitTesting(false)
+        }
+        .onHover { isHovering = $0 }
+    }
+}
+
+// NSView-based drag: uses absolute screen coords so the handle stays glued to the mouse
+private struct ResizeWidthDragView: NSViewRepresentable {
+    @Binding var width: Double
+
+    func makeNSView(context: Context) -> WidthDragNSView {
+        let v = WidthDragNSView()
+        v.onWidth = { newWidth in
+            let screenWidth = Double(NSScreen.main?.visibleFrame.width ?? 1200) - 40
+            width = max(280, min(screenWidth, newWidth))
+            NotificationCenter.default.post(name: .widthChanged, object: CGFloat(width))
+        }
+        return v
+    }
+    func updateNSView(_ nsView: WidthDragNSView, context: Context) {}
+}
+
+private final class WidthDragNSView: NSView {
+    var onWidth: ((Double) -> Void)?
+
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeLeftRight) }
+
+    override func mouseDown(with event: NSEvent) {}   // absorb to start drag tracking
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window else { return }
+        // Right edge of the popover window stays fixed; width = rightEdge − mouseX
+        let rightEdge = Double(window.frame.maxX)
+        let mouseX    = Double(NSEvent.mouseLocation.x)
+        onWidth?(rightEdge - mouseX)
+    }
+
+    override func mouseUp(with event: NSEvent) {}
+}
+
+// ── Shared ───────────────────────────────────────────────────────────────────
 
 // NSVisualEffectView wrapper for frosted glass
 struct VisualEffectView: NSViewRepresentable {
