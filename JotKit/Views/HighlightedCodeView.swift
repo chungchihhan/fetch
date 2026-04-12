@@ -7,6 +7,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     var isEditing: Bool
     var focusCode: Bool = false
     var wrapCode: Bool = false
+    var fontSize: CGFloat = 11
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
     var onHeightChange: ((CGFloat) -> Void)?
@@ -89,6 +90,13 @@ struct HighlightedCodeView: NSViewRepresentable {
             )
         }
 
+        // Sync font size
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        if textView.font != font {
+            textView.font = font
+            textView.typingAttributes = [.foregroundColor: NSColor.labelColor, .font: font]
+        }
+
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
         coord.onHeightChange = onHeightChange
@@ -137,7 +145,7 @@ struct HighlightedCodeView: NSViewRepresentable {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
                 // Keep syntax colors but force our font so edit/browse look identical
                 let result = NSMutableAttributedString(attributedString: highlighted)
-                let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+                let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
                 result.addAttribute(.font, value: font,
                                     range: NSRange(location: 0, length: result.length))
                 textView.textStorage?.setAttributedString(result)

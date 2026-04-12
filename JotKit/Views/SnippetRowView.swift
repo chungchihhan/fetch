@@ -17,13 +17,14 @@ private final class EndCursorNSTextField: NSTextField {
 private struct EndCursorTextField: NSViewRepresentable {
     @Binding var text: String
     var isFocused: Bool
+    var fontSize: CGFloat = 11
 
     func makeNSView(context: Context) -> EndCursorNSTextField {
         let field = EndCursorNSTextField()
         field.isBordered = false
         field.drawsBackground = false
         field.backgroundColor = .clear
-        field.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        field.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         field.textColor = NSColor.labelColor
         field.focusRingType = .none
         field.placeholderString = ""
@@ -33,6 +34,8 @@ private struct EndCursorTextField: NSViewRepresentable {
 
     func updateNSView(_ nsView: EndCursorNSTextField, context: Context) {
         context.coordinator.parent = self
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        if nsView.font != font { nsView.font = font }
         let isBeingEdited = nsView.currentEditor() != nil
         if !isBeingEdited, nsView.stringValue != text {
             nsView.stringValue = text
@@ -69,28 +72,33 @@ struct SnippetRowView: View {
     @State private var isHovering = false
     @State private var wrappedCodeHeight: CGFloat = 32
     @AppStorage("jotkitCodeWrap") private var codeWrap: Bool = false
+    @AppStorage("jotkitFontSize") private var storedFontSize: Double = 11
+    @AppStorage("jotkitTitleFontSize") private var storedTitleFontSize: Double = 11
     @Environment(\.colorScheme) private var colorScheme
+
+    private var fontSize: CGFloat { CGFloat(storedFontSize) }
+    private var titleFontSize: CGFloat { CGFloat(storedTitleFontSize) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Title row
             HStack(spacing: 4) {
                 Text("#")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: titleFontSize, design: .monospaced))
                     .foregroundStyle(Color(hex: "#78c9ab").opacity(isFocused ? 0.90 : (colorScheme == .dark ? 0.45 : 0.65)))
 
                 if isEditing {
                     EndCursorTextField(
                         text: Binding(get: { snippet.title }, set: { onTitleChange($0) }),
-                        isFocused: editStep == 1
+                        isFocused: editStep == 1,
+                        fontSize: titleFontSize
                     )
-                    .frame(height: 16)
+                    .frame(height: titleFontSize * 1.4)
                 } else {
                     Text(snippet.title.isEmpty ? "Untitled" : snippet.title)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: titleFontSize, design: .monospaced))
                         .foregroundStyle(.primary.opacity(isFocused ? 0.90 : 0.60))
                     Spacer(minLength: 0)
-                    // Copy icon — visible when row is focused in browse mode
                     if isFocused {
                         Button {
                             NSPasteboard.general.clearContents()
@@ -114,6 +122,7 @@ struct SnippetRowView: View {
                 isEditing: isEditing,
                 focusCode: editStep == 2,
                 wrapCode: codeWrap,
+                fontSize: fontSize,
                 onCodeChange: isEditing ? onCodeChange : nil,
                 onCursorFirstLine: onCursorFirstLine,
                 onHeightChange: codeWrap ? { wrappedCodeHeight = $0 } : nil
@@ -149,7 +158,7 @@ struct SnippetRowView: View {
     private var codeViewHeight: CGFloat {
         let lineCount = snippet.code.isEmpty ? 1 : snippet.code.components(separatedBy: "\n").count
         let visibleLines = max(1, min(lineCount, 5))
-        return CGFloat(visibleLines) * 16 + 4   // 16pt per line + 4pt inset
+        return CGFloat(visibleLines) * (fontSize * 1.5) + 4
     }
 
     private var backgroundFill: Color {
@@ -166,4 +175,3 @@ struct SnippetRowView: View {
         return Color.primary.opacity(0.10)
     }
 }
-

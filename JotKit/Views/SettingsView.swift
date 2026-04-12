@@ -6,6 +6,8 @@ struct SettingsView: View {
     @AppStorage("jotkitColorScheme") private var colorSchemeKey: String = "system"
     @AppStorage("jotkitDataDirectory") private var dataDirectory: String = ""
     @AppStorage("jotkitCodeWrap") private var codeWrap: Bool = false
+    @AppStorage("jotkitFontSize") private var fontSize: Double = 11
+    @AppStorage("jotkitTitleFontSize") private var titleFontSize: Double = 11
 
     private var displayPath: String {
         dataDirectory.isEmpty ? SnippetStore.defaultDirectory.path : dataDirectory
@@ -61,6 +63,44 @@ struct SettingsView: View {
                 Toggle("", isOn: $codeWrap)
                     .toggleStyle(.switch)
                     .labelsHidden()
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Title Font Size")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Slider(value: $titleFontSize, in: 8...20, step: 1)
+                        .frame(width: 120)
+                    Text("\(Int(titleFontSize)) pt")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .leading)
+                }
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Code Font Size")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Slider(value: $fontSize, in: 8...20, step: 1)
+                        .frame(width: 120)
+                    Text("\(Int(fontSize)) pt")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .leading)
+                }
             }
         }
         .padding(20)
