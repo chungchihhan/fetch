@@ -36,7 +36,9 @@ Fetch lives in your menu bar and lets you store, browse, and copy code snippets 
 | ⌘⌥F | Toggle Fetch (customizable in Settings) |
 | ⌘1 – ⌘6 | Switch tabs |
 | ↑ / ↓ | Navigate snippets |
-| Enter | Edit title → Edit code → Done |
+| Enter | Copy focused snippet |
+| ⌘E | Enter edit mode |
+| Tab | Switch between title and code while editing |
 | Esc | Cancel edit |
 | ⌘N | New snippet |
 | ⌘C | Copy focused snippet |
