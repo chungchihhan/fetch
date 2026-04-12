@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -17,9 +18,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyAppearance(UserDefaults.standard.string(forKey: "jotkitColorScheme") ?? "system")
         setupStatusItem()
         setupPopover()
-        hotKeyManager = HotKeyManager { [weak self] in
+        let savedKC = UserDefaults.standard.integer(forKey: "jotkitShortcutKeyCode")
+        let savedCM = UserDefaults.standard.integer(forKey: "jotkitShortcutCarbonMods")
+        let kc = savedKC > 0 ? UInt32(savedKC) : UInt32(kVK_ANSI_J)
+        let cm = savedCM > 0 ? UInt32(savedCM) : UInt32(cmdKey | optionKey)
+        hotKeyManager = HotKeyManager(keyCode: kc, carbonMods: cm, nsMods: carbonToNSMods(cm)) { [weak self] in
             self?.togglePopover()
         }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShortcutChanged),
+            name: .shortcutChanged,
+            object: nil
+        )
     }
 
     private func setupStatusItem() {
@@ -133,6 +144,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func handleHeightChanged(_ note: Notification) {
         guard let height = note.object as? CGFloat else { return }
         popover.contentSize = NSSize(width: popover.contentSize.width, height: height)
+    }
+
+    @objc func handleShortcutChanged() {
+        let kc = UserDefaults.standard.integer(forKey: "jotkitShortcutKeyCode")
+        let cm = UserDefaults.standard.integer(forKey: "jotkitShortcutCarbonMods")
+        guard kc > 0 else { return }
+        hotKeyManager?.update(keyCode: UInt32(kc), carbonMods: UInt32(cm), nsMods: carbonToNSMods(UInt32(cm)))
     }
 
     @objc func handleWidthChanged(_ note: Notification) {

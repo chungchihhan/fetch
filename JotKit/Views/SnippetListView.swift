@@ -274,6 +274,7 @@ extension Notification.Name {
     static let popoverDidOpen  = Notification.Name("JotKitPopoverDidOpen")
     static let toastMessage    = Notification.Name("JotKitToastMessage")
     static let openSettings    = Notification.Name("JotKitOpenSettings")
+    static let shortcutChanged = Notification.Name("JotKitShortcutChanged")
 }
 
 private func postToast(_ message: String) {
