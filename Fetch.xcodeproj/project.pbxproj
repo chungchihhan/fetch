@@ -18,10 +18,10 @@
 		969AEB9C6E05171CF0C8796F /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 6B1AD6A10CF1416201223A92 /* Highlightr */; };
 		98F28FF32D2C2040DA1CB9A0 /* SnippetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC305E8FD2079C6F10A275C /* SnippetTests.swift */; };
 		C9EABDCF36FD1FDDE19EBEC3 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F8708358A8707EAC2E9DEE /* SnippetStore.swift */; };
-		D880EB427C38672C3386B575 /* JotKitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89C16D09919D9095BC243A7B /* JotKitApp.swift */; };
 		DE8A4F25B993EB91B6CCD608 /* HighlightedCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03DF2950170F4BC02E3684E /* HighlightedCodeView.swift */; };
 		E3913F6CA9E07F50FDE4741A /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A7E422386A5D498BC6EB9F /* SnippetStoreTests.swift */; };
 		EED7DA11CD8FA1102C2DD1B3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5F8777C9ABE883DC2DE1A33 /* SettingsView.swift */; };
+		FF6DB5DC57BEBC7374424ED4 /* FetchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5AD7256382F628128A1A8F /* FetchApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,9 +39,9 @@
 		04F8708358A8707EAC2E9DEE /* SnippetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetStore.swift; sourceTree = "<group>"; };
 		1FBA7AF4F9DBED4D305D007C /* Fetch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fetch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2C9326C21821070A98D37859 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
+		4D5AD7256382F628128A1A8F /* FetchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchApp.swift; sourceTree = "<group>"; };
 		6FFE3815C0AC43C60A96BB1E /* PopoverContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverContentView.swift; sourceTree = "<group>"; };
 		89A7DC1847C3F6292FAB66AE /* HintBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HintBarView.swift; sourceTree = "<group>"; };
-		89C16D09919D9095BC243A7B /* JotKitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JotKitApp.swift; sourceTree = "<group>"; };
 		8E96BAC29AB9C3CE3DAC8C30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9FC305E8FD2079C6F10A275C /* SnippetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetTests.swift; sourceTree = "<group>"; };
 		9FECEE8BB1BF45BE46E524AD /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
@@ -127,9 +127,9 @@
 			isa = PBXGroup;
 			children = (
 				CF1AB4419797369D31FAD5FA /* AppDelegate.swift */,
+				4D5AD7256382F628128A1A8F /* FetchApp.swift */,
 				9FECEE8BB1BF45BE46E524AD /* HotKeyManager.swift */,
 				8E96BAC29AB9C3CE3DAC8C30 /* Info.plist */,
-				89C16D09919D9095BC243A7B /* JotKitApp.swift */,
 				1D67259EB3DD589446DADC51 /* Models */,
 				8BDF0A083FD95A99EDFD0570 /* Store */,
 				68335941E0EA42D7F04DD16B /* Views */,
@@ -226,10 +226,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				01EFFC17C4B62AA2D2171B98 /* AppDelegate.swift in Sources */,
+				FF6DB5DC57BEBC7374424ED4 /* FetchApp.swift in Sources */,
 				DE8A4F25B993EB91B6CCD608 /* HighlightedCodeView.swift in Sources */,
 				0C3B8C12C13FEBC983D9E0BC /* HintBarView.swift in Sources */,
 				196FF100ADCAC84203C789DB /* HotKeyManager.swift in Sources */,
-				D880EB427C38672C3386B575 /* JotKitApp.swift in Sources */,
 				37BD4C1559699F05B64323D9 /* PopoverContentView.swift in Sources */,
 				EED7DA11CD8FA1102C2DD1B3 /* SettingsView.swift in Sources */,
 				70F7CF261A0396F1395A4462 /* Snippet.swift in Sources */,
@@ -317,7 +317,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.harrychung.Fetch;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chih-han.Fetch";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -335,7 +335,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.harrychung.FetchTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chih-han.FetchTests";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fetch.app/Contents/MacOS/Fetch";
@@ -415,7 +415,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.harrychung.Fetch;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chih-han.Fetch";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -433,7 +433,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.harrychung.FetchTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chih-han.FetchTests";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fetch.app/Contents/MacOS/Fetch";

@@ -1,6 +1,6 @@
 name: Fetch
 options:
-  bundleIdPrefix: com.harrychung
+  bundleIdPrefix: com.chih-han
   createIntermediateGroups: true
 
 packages:
