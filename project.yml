@@ -15,12 +15,15 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - Fetch
+    resources:
+      - path: Fetch/menubar-icon.png
     dependencies:
       - package: Highlightr
     settings:
       base:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Fetch/Info.plist
       properties:

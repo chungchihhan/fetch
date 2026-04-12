@@ -34,10 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Fetch")
-            button.image?.isTemplate = true
+            if let url = Bundle.main.url(forResource: "menubar-icon", withExtension: "png"),
+               let img = NSImage(contentsOf: url) {
+                let h: CGFloat = 18
+                let w = h * (img.size.width / img.size.height)
+                img.size = NSSize(width: w, height: h)
+                img.isTemplate = true
+                button.image = img
+            } else {
+                button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Fetch")
+                button.image?.isTemplate = true
+            }
             button.action = #selector(togglePopover)
             button.target = self
         }
