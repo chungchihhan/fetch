@@ -43,7 +43,6 @@ Fetch lives in your menu bar and lets you store, browse, and copy code snippets 
 | ⌘N | New snippet |
 | ⌘C | Copy focused snippet |
 | ⌘D | Delete focused snippet |
-| ⌘P | Detach as floating panel |
 | ⌘, | Open Settings |
 
 ---
