@@ -33,7 +33,7 @@ Fetch lives in your menu bar and lets you store, browse, and copy code snippets 
 
 | Shortcut | Action |
 |----------|--------|
-| ⌘⌥J | Toggle Fetch (customizable in Settings) |
+| ⌘⌥F | Toggle Fetch (customizable in Settings) |
 | ⌘1 – ⌘6 | Switch tabs |
 | ↑ / ↓ | Navigate snippets |
 | Enter | Edit title → Edit code → Done |

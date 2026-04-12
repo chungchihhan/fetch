@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPopover()
         let savedKC = UserDefaults.standard.integer(forKey: "fetchShortcutKeyCode")
         let savedCM = UserDefaults.standard.integer(forKey: "fetchShortcutCarbonMods")
-        let kc = savedKC > 0 ? UInt32(savedKC) : UInt32(kVK_ANSI_J)
+        let kc = savedKC > 0 ? UInt32(savedKC) : UInt32(kVK_ANSI_F)
         let cm = savedCM > 0 ? UInt32(savedCM) : UInt32(cmdKey | optionKey)
         hotKeyManager = HotKeyManager(keyCode: kc, carbonMods: cm, nsMods: carbonToNSMods(cm)) { [weak self] in
             self?.togglePopover()
