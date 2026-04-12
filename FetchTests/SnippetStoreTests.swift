@@ -1,5 +1,5 @@
 import XCTest
-@testable import JotKit
+@testable import Fetch
 
 final class SnippetStoreTests: XCTestCase {
     var tmpDir: URL!

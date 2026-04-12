@@ -270,11 +270,11 @@ final class KeyCatchingNSView: NSView {
 
 // Notification names used across SnippetListView, AppDelegate, and PopoverContentView
 extension Notification.Name {
-    static let editModeChanged = Notification.Name("JotKitEditModeChanged")
-    static let popoverDidOpen  = Notification.Name("JotKitPopoverDidOpen")
-    static let toastMessage    = Notification.Name("JotKitToastMessage")
-    static let openSettings    = Notification.Name("JotKitOpenSettings")
-    static let shortcutChanged = Notification.Name("JotKitShortcutChanged")
+    static let editModeChanged = Notification.Name("FetchEditModeChanged")
+    static let popoverDidOpen  = Notification.Name("FetchPopoverDidOpen")
+    static let toastMessage    = Notification.Name("FetchToastMessage")
+    static let openSettings    = Notification.Name("FetchOpenSettings")
+    static let shortcutChanged = Notification.Name("FetchShortcutChanged")
 }
 
 private func postToast(_ message: String) {

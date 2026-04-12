@@ -71,9 +71,9 @@ struct SnippetRowView: View {
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
     @State private var wrappedCodeHeight: CGFloat = 32
-    @AppStorage("jotkitCodeWrap") private var codeWrap: Bool = false
-    @AppStorage("jotkitFontSize") private var storedFontSize: Double = 11
-    @AppStorage("jotkitTitleFontSize") private var storedTitleFontSize: Double = 11
+    @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
+    @AppStorage("fetchFontSize") private var storedFontSize: Double = 11
+    @AppStorage("fetchTitleFontSize") private var storedTitleFontSize: Double = 11
     @Environment(\.colorScheme) private var colorScheme
 
     private var fontSize: CGFloat { CGFloat(storedFontSize) }

@@ -1,5 +1,5 @@
 import XCTest
-@testable import JotKit
+@testable import Fetch
 
 final class SnippetTests: XCTestCase {
     func test_snippet_defaultLanguage_isBash() {

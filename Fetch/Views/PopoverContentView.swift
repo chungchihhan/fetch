@@ -3,9 +3,9 @@ import SwiftUI
 struct PopoverContentView: View {
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
-    @AppStorage("jotkitHeight") private var height: Double = 300
-    @AppStorage("jotkitWidth") private var width: Double = 380
-    @AppStorage("jotkitColorScheme") private var colorSchemeKey: String = "system"
+    @AppStorage("fetchHeight") private var height: Double = 300
+    @AppStorage("fetchWidth") private var width: Double = 380
+    @AppStorage("fetchColorScheme") private var colorSchemeKey: String = "system"
 
     private var preferredScheme: ColorScheme? {
         switch colorSchemeKey {

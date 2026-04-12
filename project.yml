@@ -1,4 +1,4 @@
-name: JotKit
+name: Fetch
 options:
   bundleIdPrefix: com.harrychung
   createIntermediateGroups: true
@@ -9,12 +9,12 @@ packages:
     from: "2.1.2"
 
 targets:
-  JotKit:
+  Fetch:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - JotKit
+      - Fetch
     dependencies:
       - package: Highlightr
     settings:
@@ -22,21 +22,21 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
     info:
-      path: JotKit/Info.plist
+      path: Fetch/Info.plist
       properties:
-        CFBundleName: JotKit
+        CFBundleName: Fetch
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
         LSUIElement: YES
 
-  JotKitTests:
+  FetchTests:
     type: bundle.unit-test
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - JotKitTests
+      - FetchTests
     dependencies:
-      - target: JotKit
+      - target: Fetch
     settings:
       base:
         SWIFT_VERSION: "5.9"

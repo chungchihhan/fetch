@@ -43,7 +43,7 @@ final class HotKeyManager {
     }
 
     private func registerCarbonKey(keyCode: UInt32, carbonMods: UInt32) {
-        let id = EventHotKeyID(signature: OSType(0x4A4B544B), id: 1)
+        let id = EventHotKeyID(signature: OSType(0x46455443), id: 1)
         RegisterEventHotKey(keyCode, carbonMods, id, GetApplicationEventTarget(), 0, &carbonRef)
     }
 

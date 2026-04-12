@@ -12,14 +12,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        let savedPath = UserDefaults.standard.string(forKey: "jotkitDataDirectory") ?? ""
+        let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
         let dir = savedPath.isEmpty ? SnippetStore.defaultDirectory : URL(fileURLWithPath: savedPath)
         store = SnippetStore(storageDirectory: dir)
-        applyAppearance(UserDefaults.standard.string(forKey: "jotkitColorScheme") ?? "system")
+        applyAppearance(UserDefaults.standard.string(forKey: "fetchColorScheme") ?? "system")
         setupStatusItem()
         setupPopover()
-        let savedKC = UserDefaults.standard.integer(forKey: "jotkitShortcutKeyCode")
-        let savedCM = UserDefaults.standard.integer(forKey: "jotkitShortcutCarbonMods")
+        let savedKC = UserDefaults.standard.integer(forKey: "fetchShortcutKeyCode")
+        let savedCM = UserDefaults.standard.integer(forKey: "fetchShortcutCarbonMods")
         let kc = savedKC > 0 ? UInt32(savedKC) : UInt32(kVK_ANSI_J)
         let cm = savedCM > 0 ? UInt32(savedCM) : UInt32(cmdKey | optionKey)
         hotKeyManager = HotKeyManager(keyCode: kc, carbonMods: cm, nsMods: carbonToNSMods(cm)) { [weak self] in
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "JotKit")
+            button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Fetch")
             button.image?.isTemplate = true
             button.action = #selector(togglePopover)
             button.target = self
@@ -45,8 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPopover() {
         popover = NSPopover()
-        let savedWidth  = UserDefaults.standard.double(forKey: "jotkitWidth")
-        let savedHeight = UserDefaults.standard.double(forKey: "jotkitHeight")
+        let savedWidth  = UserDefaults.standard.double(forKey: "fetchWidth")
+        let savedHeight = UserDefaults.standard.double(forKey: "fetchHeight")
         popover.contentSize = NSSize(
             width:  savedWidth  > 0 ? savedWidth  : 380,
             height: savedHeight > 0 ? savedHeight : 300
@@ -147,8 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func handleShortcutChanged() {
-        let kc = UserDefaults.standard.integer(forKey: "jotkitShortcutKeyCode")
-        let cm = UserDefaults.standard.integer(forKey: "jotkitShortcutCarbonMods")
+        let kc = UserDefaults.standard.integer(forKey: "fetchShortcutKeyCode")
+        let cm = UserDefaults.standard.integer(forKey: "fetchShortcutCarbonMods")
         guard kc > 0 else { return }
         hotKeyManager?.update(keyCode: UInt32(kc), carbonMods: UInt32(cm), nsMods: carbonToNSMods(UInt32(cm)))
     }
@@ -164,6 +164,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension Notification.Name {
-    static let heightChanged = Notification.Name("JotKitHeightChanged")
-    static let widthChanged  = Notification.Name("JotKitWidthChanged")
+    static let heightChanged = Notification.Name("FetchHeightChanged")
+    static let widthChanged  = Notification.Name("FetchWidthChanged")
 }

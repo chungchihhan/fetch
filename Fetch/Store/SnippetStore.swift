@@ -15,7 +15,7 @@ final class SnippetStore {
 
     static var defaultDirectory: URL {
         let config = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/jotkit")
+            .appendingPathComponent(".config/fetch")
         try? FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
         return config
     }

@@ -4,14 +4,14 @@ import Carbon
 
 struct SettingsView: View {
     @Environment(SnippetStore.self) var store
-    @AppStorage("jotkitColorScheme") private var colorSchemeKey: String = "system"
-    @AppStorage("jotkitDataDirectory") private var dataDirectory: String = ""
-    @AppStorage("jotkitCodeWrap") private var codeWrap: Bool = false
-    @AppStorage("jotkitFontSize") private var fontSize: Double = 11
-    @AppStorage("jotkitTitleFontSize") private var titleFontSize: Double = 11
-    @AppStorage("jotkitShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_J)
-    @AppStorage("jotkitShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
-    @AppStorage("jotkitShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ J"
+    @AppStorage("fetchColorScheme") private var colorSchemeKey: String = "system"
+    @AppStorage("fetchDataDirectory") private var dataDirectory: String = ""
+    @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
+    @AppStorage("fetchFontSize") private var fontSize: Double = 11
+    @AppStorage("fetchTitleFontSize") private var titleFontSize: Double = 11
+    @AppStorage("fetchShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_J)
+    @AppStorage("fetchShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
+    @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ J"
 
     private var displayPath: String {
         dataDirectory.isEmpty ? SnippetStore.defaultDirectory.path : dataDirectory
@@ -137,7 +137,7 @@ struct SettingsView: View {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Select"
-        panel.message = "Choose a folder for JotKit data"
+        panel.message = "Choose a folder for Fetch data"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         dataDirectory = url.path
         store.changeDirectory(to: url)
@@ -173,8 +173,8 @@ struct ShortcutRecorderView: NSViewRepresentable {
             parent.keyCode = Int(keyCode)
             parent.carbonMods = Int(carbonMods)
             parent.display = display
-            UserDefaults.standard.set(Int(keyCode),    forKey: "jotkitShortcutKeyCode")
-            UserDefaults.standard.set(Int(carbonMods), forKey: "jotkitShortcutCarbonMods")
+            UserDefaults.standard.set(Int(keyCode),    forKey: "fetchShortcutKeyCode")
+            UserDefaults.standard.set(Int(carbonMods), forKey: "fetchShortcutCarbonMods")
             NotificationCenter.default.post(name: .shortcutChanged, object: nil)
         }
     }
