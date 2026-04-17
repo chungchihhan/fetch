@@ -31,6 +31,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .shortcutChanged,
             object: nil
         )
+
+        if UserDefaults.standard.object(forKey: "fetchAutoCheckUpdates") as? Bool ?? true {
+            Task.detached { [weak self] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await Updater.shared.checkForUpdates(silent: true)
+                _ = self
+            }
+        }
     }
 
     private func setupStatusItem() {

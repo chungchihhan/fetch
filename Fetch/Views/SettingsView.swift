@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage("fetchShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_F)
     @AppStorage("fetchShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
     @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ F"
+    @AppStorage("fetchAutoCheckUpdates") private var autoCheckUpdates: Bool = true
+    @State private var updater = Updater.shared
 
     private var displayPath: String {
         dataDirectory.isEmpty ? SnippetStore.defaultDirectory.path : dataDirectory
@@ -115,6 +117,50 @@ struct SettingsView: View {
                     display: $shortcutDisplay
                 )
                 .frame(width: 100, height: 26)
+            }
+
+            Divider()
+
+            settingRow {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Version \(updater.currentVersion)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    if !updater.statusMessage.isEmpty {
+                        Text(updater.statusMessage)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: 200, alignment: .leading)
+                    }
+                }
+                Spacer()
+                if updater.updateReady {
+                    Button("Relaunch") { updater.relaunch() }
+                } else if updater.updateAvailable {
+                    Button(updater.isInstalling ? "Installing…" : "Update Now") {
+                        updater.installUpdate()
+                    }
+                    .disabled(updater.isInstalling)
+                } else {
+                    Button(updater.isChecking ? "Checking…" : "Check Now") {
+                        Task { await updater.checkForUpdates() }
+                    }
+                    .disabled(updater.isChecking)
+                }
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Auto-check for Updates")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Toggle("", isOn: $autoCheckUpdates)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
             }
         }
         .padding(20)
