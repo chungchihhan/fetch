@@ -20,6 +20,9 @@ struct PopoverContentView: View {
             // Frosted glass background
             VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                 .ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.55)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 TabBarView(activeTab: Binding(
