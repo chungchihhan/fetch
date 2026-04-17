@@ -60,20 +60,25 @@ struct TabButtonStyle: ButtonStyle {
 private struct TabButtonBody: View {
     let configuration: ButtonStyleConfiguration
     var isActive: Bool
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
+
+    private var accent: Color {
+        colorScheme == .dark ? Color(hex: "#78c9ab") : Color(hex: "#2f8f6a")
+    }
 
     var body: some View {
         configuration.label
             .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(isActive ? Color(hex: "#78c9ab") : .primary.opacity(isHovering ? 0.80 : 0.55))
+            .foregroundStyle(isActive ? accent : .primary.opacity(isHovering ? 0.80 : 0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isActive ? Color(hex: "#78c9ab").opacity(0.15) : (isHovering ? Color.primary.opacity(0.07) : .clear))
+                    .fill(isActive ? accent.opacity(0.15) : (isHovering ? Color.primary.opacity(0.07) : .clear))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(isActive ? Color(hex: "#78c9ab").opacity(0.40) : (isHovering ? Color.primary.opacity(0.18) : .clear), lineWidth: 1)
+                            .stroke(isActive ? accent.opacity(0.40) : (isHovering ? Color.primary.opacity(0.18) : .clear), lineWidth: 1)
                     )
             )
             .onHover { isHovering = $0 }
