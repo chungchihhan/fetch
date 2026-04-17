@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Fetch.xcodeproj \
+            -scheme Fetch \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package
+        run: |
+          cd build/Build/Products/Release
+          zip -r "$GITHUB_WORKSPACE/Fetch.zip" Fetch.app
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Fetch.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
