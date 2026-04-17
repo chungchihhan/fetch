@@ -1,3 +1,6 @@
+# Fetch
+**Fast, keyboard-driven code snippet manager for your Mac menu bar.**
+
 ```
       ___           ___           ___           ___           ___     
      /\  \         /\  \         /\  \         /\  \         /\__\    
@@ -12,9 +15,8 @@
                    \/__/                       \/__/         \/__/    
 ```
 
-**Fast, keyboard-driven code snippet manager for your Mac menu bar.**
-
 Fetch lives in your menu bar and lets you store, browse, and copy code snippets instantly — without leaving your keyboard.
+
 
 ## Features
 
