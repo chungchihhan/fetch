@@ -61,21 +61,6 @@ Fetch auto-checks for updates on launch. You can also open **Settings → Versio
 
 ---
 
-## Building from Source
-
-**Requirements:** macOS 14.0+, Xcode 15+, [xcodegen](https://github.com/yonaskolb/XcodeGen)
-
-```bash
-git clone https://github.com/chungchihhan/fetch.git
-cd fetch
-xcodegen generate
-open Fetch.xcodeproj
-```
-
-Then build and run with ⌘R in Xcode.
-
----
-
 ## License
 
 MIT © 2026 Chih-Han Chung
