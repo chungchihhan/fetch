@@ -9,9 +9,9 @@ struct SettingsView: View {
     @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
     @AppStorage("fetchFontSize") private var fontSize: Double = 11
     @AppStorage("fetchTitleFontSize") private var titleFontSize: Double = 11
-    @AppStorage("fetchShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_J)
+    @AppStorage("fetchShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_F)
     @AppStorage("fetchShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
-    @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ J"
+    @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ F"
 
     private var displayPath: String {
         dataDirectory.isEmpty ? SnippetStore.defaultDirectory.path : dataDirectory
@@ -182,7 +182,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
 
 final class ShortcutRecorderNSView: NSView {
     var coordinator: ShortcutRecorderView.Coordinator?
-    var displayString: String = "⌘ ⌥ J"
+    var displayString: String = "⌘ ⌥ F"
     var isRecording = false
     private var preRecordDisplay: String = ""
 
