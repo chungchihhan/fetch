@@ -31,6 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .shortcutChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleIconStyleChanged),
+            name: .iconStyleChanged,
+            object: nil
+        )
+        applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
 
         if UserDefaults.standard.object(forKey: "fetchAutoCheckUpdates") as? Bool ?? true {
             Task.detached { [weak self] in
@@ -175,12 +182,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentSize = NSSize(width: width, height: popover.contentSize.height)
     }
 
+    @objc func handleIconStyleChanged() {
+        applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
+    }
+
+    func applyIconStyle(_ style: String) {
+        let resource: String = {
+            switch style {
+            case "gloaming": return "icon-gloaming"
+            case "smoulder": return "icon-smoulder"
+            default:         return "icon-foxfire"
+            }
+        }()
+        guard let url = Bundle.main.url(forResource: resource, withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return }
+        let bundlePath = Bundle.main.bundlePath
+        NSWorkspace.shared.setIcon(image, forFile: bundlePath, options: [])
+
+        // Nudge LaunchServices so Finder re-reads the bundle's metadata on its own.
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: bundlePath)
+        NSWorkspace.shared.noteFileSystemChanged(bundlePath)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         store.saveAll()
     }
 }
 
 extension Notification.Name {
-    static let heightChanged = Notification.Name("FetchHeightChanged")
-    static let widthChanged  = Notification.Name("FetchWidthChanged")
+    static let heightChanged    = Notification.Name("FetchHeightChanged")
+    static let widthChanged     = Notification.Name("FetchWidthChanged")
+    static let iconStyleChanged = Notification.Name("FetchIconStyleChanged")
 }

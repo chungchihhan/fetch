@@ -17,6 +17,9 @@ targets:
       - Fetch
     resources:
       - path: Fetch/menubar-icon.png
+      - path: Fetch/icon-foxfire.png
+      - path: Fetch/icon-gloaming.png
+      - path: Fetch/icon-smoulder.png
     dependencies:
       - package: Highlightr
     settings:

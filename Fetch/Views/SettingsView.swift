@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("fetchShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
     @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ F"
     @AppStorage("fetchAutoCheckUpdates") private var autoCheckUpdates: Bool = true
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var updater = Updater.shared
 
     private var displayPath: String {
@@ -32,6 +33,22 @@ struct SettingsView: View {
                     Text("Dark").tag("dark")
                 }
                 .pickerStyle(.segmented)
+                .frame(width: 160)
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Icon Style")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $iconStyle) {
+                    Text("Foxfire").tag("foxfire")
+                    Text("Gloaming").tag("gloaming")
+                    Text("Smoulder").tag("smoulder")
+                }
+                .labelsHidden()
                 .frame(width: 160)
             }
 
@@ -167,6 +184,9 @@ struct SettingsView: View {
         .frame(width: 360)
         .onChange(of: colorSchemeKey) { _, newValue in
             (NSApp.delegate as? AppDelegate)?.applyAppearance(newValue)
+        }
+        .onChange(of: iconStyle) { _, _ in
+            NotificationCenter.default.post(name: .iconStyleChanged, object: nil)
         }
     }
 
