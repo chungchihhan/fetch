@@ -7,11 +7,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     var store: SnippetStore!
     var settingsWindow: NSWindow?
+    var mainWindow: NSWindow?
     var hotKeyManager: HotKeyManager?
     var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
         let dir = savedPath.isEmpty ? SnippetStore.defaultDirectory : URL(fileURLWithPath: savedPath)
         store = SnippetStore(storageDirectory: dir)
@@ -124,6 +125,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.appearance = appearance
     }
 
+    @objc func openMainWindow() {
+        if let w = mainWindow {
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 400),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Fetch"
+        window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(
+            rootView: MainWindowView().environment(store)
+        )
+        window.appearance = NSApp.appearance
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        mainWindow = window
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { openMainWindow() }
+        return true
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     @objc func openSettings() {
         if let w = settingsWindow, w.isVisible {
             w.makeKeyAndOrderFront(nil)
@@ -198,6 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let image = NSImage(contentsOf: url) else { return }
         let bundlePath = Bundle.main.bundlePath
         NSWorkspace.shared.setIcon(image, forFile: bundlePath, options: [])
+        NSApp.applicationIconImage = image
 
         // Nudge LaunchServices so Finder re-reads the bundle's metadata on its own.
         try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: bundlePath)

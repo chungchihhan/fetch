@@ -33,7 +33,6 @@ targets:
         CFBundleName: Fetch
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0.2"
-        LSUIElement: YES
 
   FetchTests:
     type: bundle.unit-test
