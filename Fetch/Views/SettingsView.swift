@@ -49,7 +49,7 @@ struct SettingsView: View {
                     Text("Smoulder").tag("smoulder")
                 }
                 .labelsHidden()
-                .frame(width: 160)
+                .fixedSize()
             }
 
             Divider()
