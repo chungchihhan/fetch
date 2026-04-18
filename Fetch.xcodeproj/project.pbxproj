@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		01EFFC17C4B62AA2D2171B98 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1AB4419797369D31FAD5FA /* AppDelegate.swift */; };
+		09ED8F440189B489E25BEA4E /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0026C4FF38411BD5A57524A4 /* MainWindowView.swift */; };
 		0C3B8C12C13FEBC983D9E0BC /* HintBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A7DC1847C3F6292FAB66AE /* HintBarView.swift */; };
 		16B93CFBCA279370C59C1D80 /* icon-gloaming.png in Resources */ = {isa = PBXBuildFile; fileRef = 5AE140C4C9B03026668C7594 /* icon-gloaming.png */; };
 		196FF100ADCAC84203C789DB /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FECEE8BB1BF45BE46E524AD /* HotKeyManager.swift */; };
@@ -41,6 +42,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0026C4FF38411BD5A57524A4 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		00A7E422386A5D498BC6EB9F /* SnippetStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetStoreTests.swift; sourceTree = "<group>"; };
 		04F8708358A8707EAC2E9DEE /* SnippetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetStore.swift; sourceTree = "<group>"; };
 		0816C68E890FC159993A5892 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 			children = (
 				D03DF2950170F4BC02E3684E /* HighlightedCodeView.swift */,
 				89A7DC1847C3F6292FAB66AE /* HintBarView.swift */,
+				0026C4FF38411BD5A57524A4 /* MainWindowView.swift */,
 				6FFE3815C0AC43C60A96BB1E /* PopoverContentView.swift */,
 				A5F8777C9ABE883DC2DE1A33 /* SettingsView.swift */,
 				F6C9925CE1C248111B6D1E10 /* SnippetListView.swift */,
@@ -264,6 +267,7 @@
 				DE8A4F25B993EB91B6CCD608 /* HighlightedCodeView.swift in Sources */,
 				0C3B8C12C13FEBC983D9E0BC /* HintBarView.swift in Sources */,
 				196FF100ADCAC84203C789DB /* HotKeyManager.swift in Sources */,
+				09ED8F440189B489E25BEA4E /* MainWindowView.swift in Sources */,
 				37BD4C1559699F05B64323D9 /* PopoverContentView.swift in Sources */,
 				EED7DA11CD8FA1102C2DD1B3 /* SettingsView.swift in Sources */,
 				70F7CF261A0396F1395A4462 /* Snippet.swift in Sources */,
