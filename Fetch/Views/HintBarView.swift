@@ -9,7 +9,7 @@ struct HintBarView: View {
             Spacer()
             Text(isEditing
                  ? "Tab/⇧Tab fields · ↵ save · Esc save · ⇧↵ newline"
-                 : "↑↓ navigate · ↵ copy · ⌘E edit · ⌘N new · ⌘D delete")
+                 : "↑↓ navigate · ↵ copy · ⌘E edit · ⌘N new · ⌘D delete · ⌘Z undo")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.primary.opacity(colorScheme == .dark ? 0.45 : 0.70))
             Spacer()
