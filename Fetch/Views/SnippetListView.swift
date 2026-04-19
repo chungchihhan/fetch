@@ -25,8 +25,19 @@ struct SnippetListView: View {
                 onKey: handler,
                 onWindowResignKey: {
                     guard store.editStep > 0 else { return }
+                    let tab = store.activeTab
+                    let currentSnippets = store.tabs[tab]
+                    if let snapshot = store.editSnapshot,
+                       let i = store.focusedIndex, i < currentSnippets.count,
+                       currentSnippets[i] != snapshot {
+                        store.undoManager.registerUndo(withTarget: store) { [snapshot, tab] s in
+                            s.replaceSnippet(id: snapshot.id, with: snapshot, tab: tab)
+                        }
+                        store.undoManager.setActionName("Edit Snippet")
+                    }
+                    store.editSnapshot = nil
                     store.editStep = 0
-                    store.save(tab: store.activeTab)
+                    store.save(tab: tab)
                     NotificationCenter.default.post(name: .editModeChanged, object: false)
                 }
             )
@@ -155,19 +166,32 @@ struct SnippetListView: View {
 
             func enterEdit() {
                 if store.focusedIndex == nil, !snippets.isEmpty { store.focusedIndex = 0 }
-                guard store.focusedIndex != nil else { return }
+                guard let i = store.focusedIndex, i < snippets.count else { return }
+                store.editSnapshot = snippets[i]
                 store.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
             }
 
             func exitEdit(copy: Bool) {
-                if copy, let i = store.focusedIndex, i < snippets.count {
+                let currentSnippets = store.tabs[store.activeTab]
+                if copy, let i = store.focusedIndex, i < currentSnippets.count {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                    NSPasteboard.general.setString(currentSnippets[i].code, forType: .string)
                     postToast("Copied")
                 } else {
                     postToast("Saved")
                 }
+                // If the content changed during the edit, register a single undo entry
+                // that captures the whole edit session.
+                if let snapshot = store.editSnapshot,
+                   let i = store.focusedIndex, i < currentSnippets.count,
+                   currentSnippets[i] != snapshot {
+                    store.undoManager.registerUndo(withTarget: store) { [snapshot, tab] s in
+                        s.replaceSnippet(id: snapshot.id, with: snapshot, tab: tab)
+                    }
+                    store.undoManager.setActionName("Edit Snippet")
+                }
+                store.editSnapshot = nil
                 store.editStep = 0
                 store.save(tab: tab)
                 NotificationCenter.default.post(name: .editModeChanged, object: false)
@@ -216,6 +240,14 @@ struct SnippetListView: View {
 
             // ─── Browse mode ─────────────────────────────────────────────────
             switch event.keyCode {
+
+            case 6 where flags == .command:         // ⌘Z — undo
+                store.undoManager.undo()
+                return true
+
+            case 6 where flags == [.command, .shift]: // ⌘⇧Z — redo
+                store.undoManager.redo()
+                return true
 
             case 36:                                // Enter — copy focused snippet code
                 if let i = store.focusedIndex, i < snippets.count {
