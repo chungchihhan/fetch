@@ -3,9 +3,14 @@ import SwiftUI
 struct TabBarView: View {
     @Binding var activeTab: Int
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(SnippetStore.self) private var store
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
+
+    private var editAccent: Color {
+        colorScheme == .dark ? Color(hex: "#e6cf5f") : Color(hex: "#b08a1e")
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -26,12 +31,17 @@ struct TabBarView: View {
 
             Spacer()
 
-            // Toast — top right
+            // Top-right indicator: toast takes precedence, otherwise "Edit Mode" while editing.
             if let msg = toastMessage {
                 Text(msg)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Color.styleAccent(colorScheme, style: iconStyle))
                     .transition(.opacity)
+                    .padding(.trailing, 12)
+            } else if store.editStep > 0 {
+                Text("Edit Mode")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(editAccent)
                     .padding(.trailing, 12)
             }
         }

@@ -174,8 +174,12 @@ struct SnippetRowView: View {
         return CGFloat(visibleLines) * (fontSize * 1.5) + 4
     }
 
+    private var editAccent: Color {
+        colorScheme == .dark ? Color(hex: "#e6cf5f") : Color(hex: "#b08a1e")
+    }
+
     private var backgroundFill: Color {
-        if isEditing { return Color(hex: "#d4855c").opacity(0.12) }
+        if isEditing { return editAccent.opacity(0.16) }
         if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.16) }
         if isHovering { return Color.primary.opacity(0.07) }
         return .clear
@@ -190,7 +194,7 @@ struct SnippetRowView: View {
     }
 
     private var borderColor: Color {
-        if isEditing { return Color(hex: "#d4855c").opacity(0.75) }
+        if isEditing { return editAccent.opacity(0.75) }
         if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)

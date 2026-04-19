@@ -26,6 +26,8 @@ struct SettingsView: View {
         TabView {
             generalTab
                 .tabItem { Label("General", systemImage: "gearshape") }
+            shortcutsTab
+                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
             aboutTab
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -39,6 +41,50 @@ struct SettingsView: View {
         .onChange(of: displayMode) { _, _ in
             NotificationCenter.default.post(name: .displayModeChanged, object: nil)
         }
+    }
+
+    private var shortcutsTab: some View {
+        VStack(spacing: 0) {
+            sectionHeader("Global", firstInList: true)
+            shortcutRow(shortcutDisplay, "Toggle Fetch")
+
+            sectionHeader("Browse")
+            shortcutRow("⌘1 – ⌘6", "Switch tabs")
+            shortcutRow("↑ / ↓", "Navigate snippets")
+            shortcutRow("↵", "Copy code only")
+            shortcutRow("⌘C", "Copy title with code")
+            shortcutRow("⌘E", "Enter edit mode")
+            shortcutRow("⌘N", "New snippet")
+            shortcutRow("⌘D", "Delete focused snippet")
+            shortcutRow("⌥↑ / ⌥↓", "Reorder snippet up / down")
+            shortcutRow("⌘Z / ⌘⇧Z", "Undo / Redo")
+            shortcutRow("⌘= / ⌘-", "Increase / decrease text size")
+            shortcutRow("⌘,", "Open Settings")
+            shortcutRow("Esc", "Close popover")
+
+            sectionHeader("Edit")
+            shortcutRow("Tab / ⇧Tab", "Switch title / code")
+            shortcutRow("↵", "Save and exit")
+            shortcutRow("Esc", "Save and exit")
+            shortcutRow("⇧↵", "New line in code")
+            shortcutRow("⌘E", "Exit edit")
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    private func shortcutRow(_ keys: String, _ description: String) -> some View {
+        HStack(alignment: .center) {
+            Text(keys)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.primary.opacity(0.80))
+                .frame(width: 120, alignment: .leading)
+            Text(description)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 5)
     }
 
     private var aboutTab: some View {
