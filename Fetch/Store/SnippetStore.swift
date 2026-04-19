@@ -7,6 +7,9 @@ final class SnippetStore {
     var activeTab: Int = 0
     var focusedIndex: Int? = nil
     var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
+    var editSnapshot: Snippet? = nil   // snapshot taken when edit begins, used for undo
+
+    let undoManager = UndoManager()
 
     private var storageDirectory: URL
 
@@ -23,17 +26,35 @@ final class SnippetStore {
     }
 
     func addSnippet() {
-        var updated = tabs[activeTab]
-        updated.append(Snippet(title: "", code: ""))
-        tabs[activeTab] = updated           // explicit set → reliable @Observable notification
-        save(tab: activeTab)
+        let snippet = Snippet(title: "", code: "")
+        insertSnippet(snippet, at: tabs[activeTab].count, tab: activeTab, actionName: "Add Snippet")
     }
 
     func deleteSnippet(id: UUID, tab: Int) {
         var updated = tabs[tab]
-        updated.removeAll { $0.id == id }
-        tabs[tab] = updated                 // explicit set → reliable @Observable notification
+        guard let idx = updated.firstIndex(where: { $0.id == id }) else { return }
+        let removed = updated.remove(at: idx)
+        tabs[tab] = updated
         save(tab: tab)
+
+        undoManager.registerUndo(withTarget: self) { [removed, idx, tab] store in
+            store.insertSnippet(removed, at: idx, tab: tab, actionName: nil)
+        }
+        undoManager.setActionName("Delete Snippet")
+    }
+
+    private func insertSnippet(_ snippet: Snippet, at index: Int, tab: Int, actionName: String?) {
+        var arr = tabs[tab]
+        let safeIndex = min(max(0, index), arr.count)
+        arr.insert(snippet, at: safeIndex)
+        tabs[tab] = arr
+        save(tab: tab)
+
+        let id = snippet.id
+        undoManager.registerUndo(withTarget: self) { [id, tab] store in
+            store.deleteSnippet(id: id, tab: tab)
+        }
+        if let actionName { undoManager.setActionName(actionName) }
     }
 
     /// Move the snippet at `from` so that it's inserted at `toOffset` in the same tab.
@@ -48,7 +69,30 @@ final class SnippetStore {
         updated.move(fromOffsets: IndexSet(integer: from), toOffset: clamped)
         tabs[tab] = updated
         save(tab: tab)
-        return from < clamped ? clamped - 1 : clamped
+
+        let finalIndex = from < clamped ? clamped - 1 : clamped
+        // To undo: move back so the snippet lands at the original `from` index.
+        let inverseOffset = from < clamped ? from : from + 1
+        undoManager.registerUndo(withTarget: self) { [finalIndex, inverseOffset, tab] store in
+            _ = store.moveSnippet(from: finalIndex, toOffset: inverseOffset, tab: tab)
+        }
+        undoManager.setActionName("Move Snippet")
+        return finalIndex
+    }
+
+    /// Replace the snippet with `id` by `newValue` (preserving position). Registers undo.
+    func replaceSnippet(id: UUID, with newValue: Snippet, tab: Int) {
+        var arr = tabs[tab]
+        guard let idx = arr.firstIndex(where: { $0.id == id }) else { return }
+        let old = arr[idx]
+        arr[idx] = newValue
+        tabs[tab] = arr
+        save(tab: tab)
+
+        undoManager.registerUndo(withTarget: self) { [old, tab, id] store in
+            store.replaceSnippet(id: id, with: old, tab: tab)
+        }
+        undoManager.setActionName("Edit Snippet")
     }
 
     @discardableResult
