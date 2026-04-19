@@ -17,9 +17,13 @@
 
 Fetch lives in your menu bar (or Dock, or both) and lets you store, browse, and copy code snippets instantly — without leaving your keyboard.
 
-<!-- Drop screenshots into docs/ and uncomment the lines below -->
-<!-- ![Popover](docs/popover.png) -->
-<!-- ![Main window](docs/window.png) -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/68db94e1-d90a-4f7e-9b6b-7168d1687122" width="180" alt="Foxfire" />
+  <img src="https://github.com/user-attachments/assets/1de30fa8-b231-4585-9c98-03fc64e05fab" width="180" alt="Gloaming" />
+  <img src="https://github.com/user-attachments/assets/1dea227d-0118-4ec0-b4ea-bb8ba143cff5" width="180" alt="Smoulder" />
+</p>
+
+<p align="center"><sub><b>Foxfire</b> · <b>Gloaming</b> · <b>Smoulder</b></sub></p>
 
 ## Features
 
