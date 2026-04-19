@@ -1,17 +1,16 @@
 import SwiftUI
 import AppKit
 
-// View-local editing state. Focus index lives on SnippetStore so it syncs
-// across the popover and the main window.
+// View-local nav state. Edit mode and focus index live on SnippetStore so
+// they sync across the popover and the main window.
 @Observable
 private final class ListNavState {
-    var editStep: Int = 0        // 0=browse, 1=title edit, 2=code edit
     var cursorOnFirstLine: Bool = true
-    var isEditing: Bool { editStep > 0 }
 }
 
 struct SnippetListView: View {
     @Environment(SnippetStore.self) var store
+    @Environment(\.colorScheme) private var colorScheme
     @State private var nav = ListNavState()
     @State private var dropTargetIndex: Int? = nil
 
@@ -22,8 +21,16 @@ struct SnippetListView: View {
 
         ZStack {
             // Zero-size background view that installs the key monitor
-            KeyMonitorView(onKey: handler)
-                .frame(width: 0, height: 0)
+            KeyMonitorView(
+                onKey: handler,
+                onWindowResignKey: {
+                    guard store.editStep > 0 else { return }
+                    store.editStep = 0
+                    store.save(tab: store.activeTab)
+                    NotificationCenter.default.post(name: .editModeChanged, object: false)
+                }
+            )
+            .frame(width: 0, height: 0)
 
             // Content stays in normal SwiftUI hierarchy for proper @Observable tracking
             if snippets.isEmpty {
@@ -39,7 +46,7 @@ struct SnippetListView: View {
                                 SnippetRowView(
                                     snippet: binding(for: i),
                                     isFocused: store.focusedIndex == i,
-                                    editStep: store.focusedIndex == i ? nav.editStep : 0,
+                                    editStep: store.focusedIndex == i ? store.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
                                     onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
@@ -47,14 +54,14 @@ struct SnippetListView: View {
                                 .id(i)
                                 .overlay(alignment: .top) {
                                     Rectangle()
-                                        .fill(Color(hex: "#78c9ab"))
+                                        .fill(Color.jadeAccent(colorScheme))
                                         .frame(height: 2)
                                         .offset(y: -6)
                                         .opacity(dropTargetIndex == i ? 1 : 0)
                                 }
                                 .onTapGesture {
                                     store.focusedIndex = i
-                                    guard nav.editStep == 0 else { return }
+                                    guard store.editStep == 0 else { return }
                                     let snippets = store.tabs[store.activeTab]
                                     guard i < snippets.count else { return }
                                     NSPasteboard.general.clearContents()
@@ -79,7 +86,7 @@ struct SnippetListView: View {
                                 .contentShape(Rectangle())
                                 .overlay(alignment: .top) {
                                     Rectangle()
-                                        .fill(Color(hex: "#78c9ab"))
+                                        .fill(Color.jadeAccent(colorScheme))
                                         .frame(height: 2)
                                         .opacity(dropTargetIndex == snippets.count ? 1 : 0)
                                 }
@@ -106,7 +113,7 @@ struct SnippetListView: View {
             }
         }
         .onChange(of: store.activeTab) { _, newTab in
-            nav.editStep = 0
+            store.editStep = 0
             nav.cursorOnFirstLine = true
             let tabSnippets = store.tabs[newTab]
             store.focusedIndex = tabSnippets.isEmpty ? nil : 0
@@ -149,7 +156,7 @@ struct SnippetListView: View {
             func enterEdit() {
                 if store.focusedIndex == nil, !snippets.isEmpty { store.focusedIndex = 0 }
                 guard store.focusedIndex != nil else { return }
-                nav.editStep = 1
+                store.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
             }
 
@@ -161,20 +168,20 @@ struct SnippetListView: View {
                 } else {
                     postToast("Saved")
                 }
-                nav.editStep = 0
+                store.editStep = 0
                 store.save(tab: tab)
                 NotificationCenter.default.post(name: .editModeChanged, object: false)
             }
 
             // ─── Edit mode ───────────────────────────────────────────────────
-            if nav.editStep > 0 {
+            if store.editStep > 0 {
                 switch event.keyCode {
 
                 case 14 where flags == .command:    // ⌘E — save and exit
                     exitEdit(copy: false); return true
 
                 case 36:                            // Enter / Shift+Enter
-                    if nav.editStep == 2 && flags.contains(.shift) {
+                    if store.editStep == 2 && flags.contains(.shift) {
                         return false                // Shift+Enter in code → newline (pass through)
                     }
                     exitEdit(copy: false)           // Enter → save + exit (no copy)
@@ -185,20 +192,20 @@ struct SnippetListView: View {
 
                 case 48:                            // Tab / Shift+Tab — navigate fields
                     if flags.contains(.shift) {
-                        if nav.editStep == 2 { nav.editStep = 1 }   // code → title
+                        if store.editStep == 2 { store.editStep = 1 }   // code → title
                     } else {
-                        if nav.editStep == 1 { nav.editStep = 2 }   // title → code
+                        if store.editStep == 1 { store.editStep = 2 }   // title → code
                     }
                     return true
 
                 case 125:                           // ↓
-                    if nav.editStep == 1 { nav.editStep = 2; return true } // title → code
+                    if store.editStep == 1 { store.editStep = 2; return true } // title → code
                     return false                    // in code: pass through (NSTextView navigates)
 
                 case 126:                           // ↑
-                    if nav.editStep == 1 { return true }          // in title: do nothing
-                    if nav.editStep == 2 && nav.cursorOnFirstLine { // in code first line → title
-                        nav.editStep = 1; return true
+                    if store.editStep == 1 { return true }          // in title: do nothing
+                    if store.editStep == 2 && nav.cursorOnFirstLine { // in code first line → title
+                        store.editStep = 1; return true
                     }
                     return false                    // in code: pass through
 
@@ -291,34 +298,52 @@ struct SnippetListView: View {
 // Zero-size NSViewRepresentable — only installs a local key monitor
 struct KeyMonitorView: NSViewRepresentable {
     let onKey: (NSEvent) -> Bool
+    var onWindowResignKey: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> KeyCatchingNSView {
         let v = KeyCatchingNSView()
         v.onKey = onKey
+        v.onWindowResignKey = onWindowResignKey
         return v
     }
 
     func updateNSView(_ nsView: KeyCatchingNSView, context: Context) {
         nsView.onKey = onKey
+        nsView.onWindowResignKey = onWindowResignKey
     }
 }
 
 final class KeyCatchingNSView: NSView {
     var onKey: ((NSEvent) -> Bool)?
+    var onWindowResignKey: (() -> Void)?
     private var localMonitor: Any?
+    private var resignObserver: Any?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let m = localMonitor { NSEvent.removeMonitor(m); localMonitor = nil }
-        guard window != nil else { return }
+        if let o = resignObserver { NotificationCenter.default.removeObserver(o); resignObserver = nil }
+        guard let window else { return }
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
+            // Only handle events targeted at our own window. Without this filter,
+            // every instance of this view (popover + main window) would intercept
+            // every key press in the app, causing double-mutations and cross-fire.
+            guard let self, let selfWindow = self.window,
+                  event.window === selfWindow else { return event }
             return self.onKey?(event) == true ? nil : event
+        }
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.onWindowResignKey?()
         }
     }
 
     deinit {
         if let m = localMonitor { NSEvent.removeMonitor(m) }
+        if let o = resignObserver { NotificationCenter.default.removeObserver(o) }
     }
 }
 
