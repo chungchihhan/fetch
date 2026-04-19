@@ -74,6 +74,7 @@ struct SnippetRowView: View {
     @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
     @AppStorage("fetchFontSize") private var storedFontSize: Double = 11
     @AppStorage("fetchTitleFontSize") private var storedTitleFontSize: Double = 11
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @Environment(\.colorScheme) private var colorScheme
 
     private var fontSize: CGFloat { CGFloat(storedFontSize) }
@@ -175,14 +176,14 @@ struct SnippetRowView: View {
 
     private var backgroundFill: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.12) }
-        if isFocused { return Color.jadeAccent(colorScheme).opacity(0.16) }
+        if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.16) }
         if isHovering { return Color.primary.opacity(0.07) }
         return .clear
     }
 
     private var hashColor: Color {
         if colorScheme == .dark {
-            return Color.jadeAccent(colorScheme).opacity(isFocused ? 0.90 : 0.45)
+            return Color.styleAccent(colorScheme, style: iconStyle).opacity(isFocused ? 0.90 : 0.45)
         } else {
             return Color.primary.opacity(isFocused ? 0.90 : 0.60)
         }
@@ -190,7 +191,7 @@ struct SnippetRowView: View {
 
     private var borderColor: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.75) }
-        if isFocused { return Color.jadeAccent(colorScheme).opacity(0.70) }
+        if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
     }

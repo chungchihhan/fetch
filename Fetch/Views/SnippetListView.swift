@@ -11,6 +11,7 @@ private final class ListNavState {
 struct SnippetListView: View {
     @Environment(SnippetStore.self) var store
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var nav = ListNavState()
     @State private var dropTargetIndex: Int? = nil
 
@@ -65,7 +66,7 @@ struct SnippetListView: View {
                                 .id(i)
                                 .overlay(alignment: .top) {
                                     Rectangle()
-                                        .fill(Color.jadeAccent(colorScheme))
+                                        .fill(Color.styleAccent(colorScheme, style: iconStyle))
                                         .frame(height: 2)
                                         .offset(y: -6)
                                         .opacity(dropTargetIndex == i ? 1 : 0)
@@ -97,7 +98,7 @@ struct SnippetListView: View {
                                 .contentShape(Rectangle())
                                 .overlay(alignment: .top) {
                                     Rectangle()
-                                        .fill(Color.jadeAccent(colorScheme))
+                                        .fill(Color.styleAccent(colorScheme, style: iconStyle))
                                         .frame(height: 2)
                                         .opacity(dropTargetIndex == snippets.count ? 1 : 0)
                                 }

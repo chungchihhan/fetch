@@ -3,6 +3,7 @@ import SwiftUI
 struct TabBarView: View {
     @Binding var activeTab: Int
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
@@ -29,7 +30,7 @@ struct TabBarView: View {
             if let msg = toastMessage {
                 Text(msg)
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Color.jadeAccent(colorScheme))
+                    .foregroundStyle(Color.styleAccent(colorScheme, style: iconStyle))
                     .transition(.opacity)
                     .padding(.trailing, 12)
             }
@@ -63,9 +64,10 @@ private struct TabButtonBody: View {
     var isActive: Bool
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("fetchTabFontSize") private var tabFontSize: Double = 10
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var isHovering = false
 
-    private var accent: Color { Color.jadeAccent(colorScheme) }
+    private var accent: Color { Color.styleAccent(colorScheme, style: iconStyle) }
 
     var body: some View {
         configuration.label
@@ -97,7 +99,14 @@ extension Color {
         self.init(red: r, green: g, blue: b)
     }
 
-    static func jadeAccent(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: "#78c9ab") : Color(hex: "#2f8f6a")
+    static func styleAccent(_ scheme: ColorScheme, style: String) -> Color {
+        switch style {
+        case "gloaming":
+            return scheme == .dark ? Color(hex: "#82b5d4") : Color(hex: "#2f6a9f")
+        case "smoulder":
+            return scheme == .dark ? Color(hex: "#d48a8a") : Color(hex: "#9f2f3f")
+        default: // foxfire
+            return scheme == .dark ? Color(hex: "#78c9ab") : Color(hex: "#2f8f6a")
+        }
     }
 }
