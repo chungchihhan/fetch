@@ -1,21 +1,13 @@
 # Fetch
 **Fast, keyboard-driven code snippet manager for your Mac.**
-
-```
-      ___           ___           ___           ___           ___     
-     /\  \         /\  \         /\  \         /\  \         /\__\    
-    /::\  \       /::\  \        \:\  \       /::\  \       /:/  /    
-   /:/\:\  \     /:/\:\  \        \:\  \     /:/\:\  \     /:/__/     
-  /::\~\:\  \   /::\~\:\  \       /::\  \   /:/  \:\  \   /::\  \ ___ 
- /:/\:\ \:\__\ /:/\:\ \:\__\     /:/\:\__\ /:/__/ \:\__\ /:/\:\  /\__\
- \/__\:\ \/__/ \:\~\:\ \/__/    /:/  \/__/ \:\  \  \/__/ \/__\:\/:/  /
-      \:\__\    \:\ \:\__\     /:/  /       \:\  \            \::/  / 
-       \/__/     \:\ \/__/     \/__/         \:\  \           /:/  /  
-                  \:\__\                      \:\__\         /:/  /   
-                   \/__/                       \/__/         \/__/    
-```
-
 Fetch lives in your menu bar (or Dock, or both) and lets you store, browse, and copy code snippets instantly — without leaving your keyboard.
+
+
+https://github.com/user-attachments/assets/181aa989-2b03-45bd-a480-ef7036992103
+
+
+
+
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/68db94e1-d90a-4f7e-9b6b-7168d1687122" width="180" alt="Foxfire" />
