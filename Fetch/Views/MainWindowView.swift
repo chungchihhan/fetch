@@ -14,13 +14,21 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            TabBarView(activeTab: Binding(
-                get: { store.activeTab },
-                set: { store.activeTab = $0 }
-            ))
-            SnippetListView()
-            HintBarView(isEditing: isEditing)
+        ZStack {
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.55)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                TabBarView(activeTab: Binding(
+                    get: { store.activeTab },
+                    set: { store.activeTab = $0 }
+                ))
+                SnippetListView()
+                HintBarView(isEditing: isEditing)
+            }
         }
         .frame(minWidth: 380, minHeight: 300)
         .preferredColorScheme(preferredScheme)

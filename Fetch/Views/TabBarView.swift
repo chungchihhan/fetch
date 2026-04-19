@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TabBarView: View {
     @Binding var activeTab: Int
+    @Environment(\.colorScheme) private var colorScheme
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
@@ -28,7 +29,7 @@ struct TabBarView: View {
             if let msg = toastMessage {
                 Text(msg)
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Color(hex: "#78c9ab"))
+                    .foregroundStyle(Color.jadeAccent(colorScheme))
                     .transition(.opacity)
                     .padding(.trailing, 12)
             }
@@ -64,9 +65,7 @@ private struct TabButtonBody: View {
     @AppStorage("fetchTabFontSize") private var tabFontSize: Double = 10
     @State private var isHovering = false
 
-    private var accent: Color {
-        colorScheme == .dark ? Color(hex: "#78c9ab") : Color(hex: "#2f8f6a")
-    }
+    private var accent: Color { Color.jadeAccent(colorScheme) }
 
     var body: some View {
         configuration.label
@@ -96,5 +95,9 @@ extension Color {
         let g = Double((int >> 8) & 0xff) / 255
         let b = Double(int & 0xff) / 255
         self.init(red: r, green: g, blue: b)
+    }
+
+    static func jadeAccent(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(hex: "#78c9ab") : Color(hex: "#2f8f6a")
     }
 }

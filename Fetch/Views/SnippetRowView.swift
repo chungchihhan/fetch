@@ -114,7 +114,7 @@ struct SnippetRowView: View {
             HStack(spacing: 4) {
                 Text("#")
                     .font(.system(size: titleFontSize, design: .monospaced))
-                    .foregroundStyle(Color(hex: "#78c9ab").opacity(isFocused ? 0.90 : (colorScheme == .dark ? 0.45 : 0.65)))
+                    .foregroundStyle(hashColor)
 
                 if isEditing {
                     EndCursorTextField(
@@ -175,14 +175,22 @@ struct SnippetRowView: View {
 
     private var backgroundFill: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.12) }
-        if isFocused { return Color(hex: "#78c9ab").opacity(0.16) }
+        if isFocused { return Color.jadeAccent(colorScheme).opacity(0.16) }
         if isHovering { return Color.primary.opacity(0.07) }
         return .clear
     }
 
+    private var hashColor: Color {
+        if colorScheme == .dark {
+            return Color.jadeAccent(colorScheme).opacity(isFocused ? 0.90 : 0.45)
+        } else {
+            return Color.primary.opacity(isFocused ? 0.90 : 0.60)
+        }
+    }
+
     private var borderColor: Color {
         if isEditing { return Color(hex: "#d4855c").opacity(0.75) }
-        if isFocused { return Color(hex: "#78c9ab").opacity(0.70) }
+        if isFocused { return Color.jadeAccent(colorScheme).opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
     }

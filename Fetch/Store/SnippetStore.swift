@@ -6,6 +6,7 @@ final class SnippetStore {
     var tabs: [[Snippet]] = Array(repeating: [], count: 6)
     var activeTab: Int = 0
     var focusedIndex: Int? = nil
+    var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
 
     private var storageDirectory: URL
 
