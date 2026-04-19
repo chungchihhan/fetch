@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
     @AppStorage("fetchFontSize") private var fontSize: Double = 11
     @AppStorage("fetchTitleFontSize") private var titleFontSize: Double = 11
+    @AppStorage("fetchTabFontSize") private var tabFontSize: Double = 10
     @AppStorage("fetchShortcutKeyCode") private var shortcutKeyCode: Int = Int(kVK_ANSI_F)
     @AppStorage("fetchShortcutCarbonMods") private var shortcutCarbonMods: Int = Int(cmdKey | optionKey)
     @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ F"
@@ -80,6 +81,23 @@ struct SettingsView: View {
                 Toggle("", isOn: $codeWrap)
                     .toggleStyle(.switch)
                     .labelsHidden()
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Tab Font Size")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                HStack(spacing: 8) {
+                    Slider(value: $tabFontSize, in: 8...20, step: 1)
+                        .frame(width: 120)
+                    Text("\(Int(tabFontSize)) pt")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .leading)
+                }
             }
 
             Divider()
