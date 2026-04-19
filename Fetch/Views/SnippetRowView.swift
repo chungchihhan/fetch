@@ -87,11 +87,28 @@ struct SnippetRowView: View {
                     GripHandle().opacity(0.8).padding(8)
                 }
 
-            rowBody
+            rowContent
+                .padding(8)
+                .background(backgroundFill)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active:
+                        isHovering = true
+                        if !isEditing { NSCursor.pointingHand.set() }
+                    case .ended:
+                        isHovering = false
+                        NSCursor.arrow.set()
+                    }
+                }
         }
     }
 
-    private var rowBody: some View {
+    private var rowContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Title row
             HStack(spacing: 4) {
@@ -147,23 +164,6 @@ struct SnippetRowView: View {
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))
         }
-        .padding(8)
-        .background(backgroundFill)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: 1)
-        )
-        .onContinuousHover { phase in
-            switch phase {
-            case .active:
-                isHovering = true
-                if !isEditing { NSCursor.pointingHand.set() }
-            case .ended:
-                isHovering = false
-                NSCursor.arrow.set()
-            }
-        }
     }
 
     // 1–5 visible lines, then vertical scroll
@@ -188,19 +188,16 @@ struct SnippetRowView: View {
     }
 }
 
-// Six-dot grip (2 columns × 3 rows) used as the drag handle.
+// Three-dot vertical grip used as the drag handle.
 struct GripHandle: View {
     var body: some View {
         VStack(spacing: 2) {
             ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: 2) {
-                    Circle().frame(width: 2.5, height: 2.5)
-                    Circle().frame(width: 2.5, height: 2.5)
-                }
+                Circle().frame(width: 2.5, height: 2.5)
             }
         }
         .foregroundStyle(.primary)
-        .frame(width: 10)
+        .frame(width: 6)
         .contentShape(Rectangle())
         .onHover { hovering in
             if hovering { NSCursor.openHand.set() } else { NSCursor.arrow.set() }

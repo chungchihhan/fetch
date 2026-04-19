@@ -94,8 +94,10 @@ struct SnippetListView: View {
                                     else if dropTargetIndex == snippets.count { dropTargetIndex = nil }
                                 }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.leading, 12)
+                        .padding(.trailing, 18)
+                        .padding(.top, 18)
+                        .padding(.bottom, 10)
                     }
                     .onChange(of: store.focusedIndex) { _, idx in
                         if let idx { proxy.scrollTo(idx, anchor: .center) }
