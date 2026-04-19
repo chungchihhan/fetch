@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("fetchShortcutDisplay") private var shortcutDisplay: String = "⌘ ⌥ F"
     @AppStorage("fetchAutoCheckUpdates") private var autoCheckUpdates: Bool = true
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
+    @AppStorage("fetchDisplayMode") private var displayMode: String = "both"
     @State private var updater = Updater.shared
 
     private var displayPath: String {
@@ -35,6 +36,22 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 160)
+            }
+
+            Divider()
+
+            settingRow {
+                Text("Display Mode")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $displayMode) {
+                    Text("Both").tag("both")
+                    Text("Menu Bar Only").tag("menuBarOnly")
+                    Text("Window Only").tag("windowOnly")
+                }
+                .labelsHidden()
+                .fixedSize()
             }
 
             Divider()
@@ -205,6 +222,9 @@ struct SettingsView: View {
         }
         .onChange(of: iconStyle) { _, _ in
             NotificationCenter.default.post(name: .iconStyleChanged, object: nil)
+        }
+        .onChange(of: displayMode) { _, _ in
+            NotificationCenter.default.post(name: .displayModeChanged, object: nil)
         }
     }
 

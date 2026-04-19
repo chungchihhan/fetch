@@ -3,7 +3,7 @@ import Carbon
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var statusItem: NSStatusItem!
+    var statusItem: NSStatusItem?
     var popover: NSPopover!
     var store: SnippetStore!
     var settingsWindow: NSWindow?
@@ -12,13 +12,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
         let dir = savedPath.isEmpty ? SnippetStore.defaultDirectory : URL(fileURLWithPath: savedPath)
         store = SnippetStore(storageDirectory: dir)
         applyAppearance(UserDefaults.standard.string(forKey: "fetchColorScheme") ?? "system")
-        setupStatusItem()
         setupPopover()
+        applyDisplayMode(UserDefaults.standard.string(forKey: "fetchDisplayMode") ?? "both")
         let savedKC = UserDefaults.standard.integer(forKey: "fetchShortcutKeyCode")
         let savedCM = UserDefaults.standard.integer(forKey: "fetchShortcutCarbonMods")
         let kc = savedKC > 0 ? UInt32(savedKC) : UInt32(kVK_ANSI_F)
@@ -38,6 +37,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .iconStyleChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDisplayModeChanged),
+            name: .displayModeChanged,
+            object: nil
+        )
         applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
 
         if UserDefaults.standard.object(forKey: "fetchAutoCheckUpdates") as? Bool ?? true {
@@ -50,8 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = item
+        if let button = item.button {
             if let url = Bundle.main.url(forResource: "menubar-icon", withExtension: "png"),
                let img = NSImage(contentsOf: url) {
                 let h: CGFloat = 18
@@ -158,7 +164,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        let mode = UserDefaults.standard.string(forKey: "fetchDisplayMode") ?? "both"
+        return mode == "windowOnly"
+    }
+
+    @objc func handleDisplayModeChanged() {
+        applyDisplayMode(UserDefaults.standard.string(forKey: "fetchDisplayMode") ?? "both")
+    }
+
+    func applyDisplayMode(_ mode: String) {
+        switch mode {
+        case "menuBarOnly":
+            NSApp.setActivationPolicy(.accessory)
+            if statusItem == nil { setupStatusItem() }
+            mainWindow?.close()
+        case "windowOnly":
+            NSApp.setActivationPolicy(.regular)
+            if let item = statusItem {
+                NSStatusBar.system.removeStatusItem(item)
+                statusItem = nil
+            }
+            if mainWindow == nil || mainWindow?.isVisible == false { openMainWindow() }
+        default: // "both"
+            NSApp.setActivationPolicy(.regular)
+            if statusItem == nil { setupStatusItem() }
+        }
     }
 
     @objc func openSettings() {
@@ -189,7 +219,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            guard let button = statusItem.button else { return }
+            // With no menu-bar icon, fall back to the main window instead.
+            guard let button = statusItem?.button else {
+                openMainWindow()
+                return
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             DispatchQueue.main.async {
@@ -248,7 +282,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension Notification.Name {
-    static let heightChanged    = Notification.Name("FetchHeightChanged")
-    static let widthChanged     = Notification.Name("FetchWidthChanged")
-    static let iconStyleChanged = Notification.Name("FetchIconStyleChanged")
+    static let heightChanged      = Notification.Name("FetchHeightChanged")
+    static let widthChanged       = Notification.Name("FetchWidthChanged")
+    static let iconStyleChanged   = Notification.Name("FetchIconStyleChanged")
+    static let displayModeChanged = Notification.Name("FetchDisplayModeChanged")
 }
