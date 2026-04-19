@@ -139,6 +139,12 @@ struct SnippetListView: View {
             let tab = store.activeTab
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
+            // ⌘= / ⌘- — adjust snippet font size globally (works in any mode).
+            if flags.contains(.command), event.keyCode == 24 || event.keyCode == 27 {
+                adjustFontSize(delta: event.keyCode == 24 ? 1 : -1)
+                return true
+            }
+
 
             func enterEdit() {
                 if store.focusedIndex == nil, !snippets.isEmpty { store.focusedIndex = 0 }
@@ -327,4 +333,14 @@ extension Notification.Name {
 
 private func postToast(_ message: String) {
     NotificationCenter.default.post(name: .toastMessage, object: message)
+}
+
+private func adjustFontSize(delta: Double) {
+    let d = UserDefaults.standard
+    let curCode = (d.object(forKey: "fetchFontSize") as? Double) ?? 11
+    let curTitle = (d.object(forKey: "fetchTitleFontSize") as? Double) ?? 11
+    let curTab = (d.object(forKey: "fetchTabFontSize") as? Double) ?? 10
+    d.set(max(8, min(20, curCode + delta)), forKey: "fetchFontSize")
+    d.set(max(8, min(20, curTitle + delta)), forKey: "fetchTitleFontSize")
+    d.set(max(8, min(20, curTab + delta)), forKey: "fetchTabFontSize")
 }

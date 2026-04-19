@@ -61,6 +61,7 @@ private struct TabButtonBody: View {
     let configuration: ButtonStyleConfiguration
     var isActive: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchTabFontSize") private var tabFontSize: Double = 10
     @State private var isHovering = false
 
     private var accent: Color {
@@ -69,7 +70,7 @@ private struct TabButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: 10, design: .monospaced))
+            .font(.system(size: CGFloat(tabFontSize), design: .monospaced))
             .foregroundStyle(isActive ? accent : .primary.opacity(isHovering ? 0.80 : 0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
