@@ -54,15 +54,17 @@ struct ResizeHandle: View {
     @State private var isHovering = false
 
     var body: some View {
-        ZStack {
-            Color.clear.frame(height: 8)
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.primary.opacity(isHovering ? 0.25 : 0.12))
-                .frame(width: 36, height: 3)
-        }
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .overlay(ResizeCursorView())
+        Color.clear
+            .frame(height: 8)
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    NSCursor.resizeUpDown.set()
+                case .ended:
+                    NSCursor.arrow.set()
+                }
+            }
         .gesture(
             DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { value in
@@ -91,19 +93,10 @@ final class ResizeCursorNSView: NSView {
 
 struct ResizeWidthHandle: View {
     @Binding var width: Double
-    @State private var isHovering = false
 
     var body: some View {
-        ZStack {
-            // Wider hit area
-            ResizeWidthDragView(width: $width)
-                .frame(width: 8)
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.primary.opacity(isHovering ? 0.25 : 0.12))
-                .frame(width: 3, height: 36)
-                .allowsHitTesting(false)
-        }
-        .onHover { isHovering = $0 }
+        ResizeWidthDragView(width: $width)
+            .frame(width: 8)
     }
 }
 
