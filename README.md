@@ -1,5 +1,5 @@
 # Fetch
-**Fast, keyboard-driven code snippet manager for your Mac menu bar.**
+**Fast, keyboard-driven code snippet manager for your Mac.**
 
 ```
       ___           ___           ___           ___           ___     
@@ -15,21 +15,27 @@
                    \/__/                       \/__/         \/__/    
 ```
 
-Fetch lives in your menu bar and lets you store, browse, and copy code snippets instantly — without leaving your keyboard.
+Fetch lives in your menu bar (or Dock, or both) and lets you store, browse, and copy code snippets instantly — without leaving your keyboard.
 
+<!-- Drop screenshots into docs/ and uncomment the lines below -->
+<!-- ![Popover](docs/popover.png) -->
+<!-- ![Main window](docs/window.png) -->
 
 ## Features
 
 - **6 tabs** — organize snippets by language or project
+- **Menu bar popover, main window, or both** — pick your workflow in Settings
+- **Drag-to-reorder** — grab the grip on the left, or ⌥↑ / ⌥↓ from the keyboard
+- **Undo / redo** — ⌘Z / ⌘⇧Z for add, delete, reorder, and content edits
 - **Syntax highlighting** — automatic code highlighting via Highlightr
-- **Keyboard-first** — navigate, edit, and copy without touching the mouse
-- **Global shortcut** — summon Fetch from anywhere with a customizable hotkey (default: ⌘⌥F)
+- **Global shortcut** — summon Fetch from anywhere (default: ⌘⌥F, customizable)
+- **Icon themes** — Foxfire (green), Gloaming (blue), Smoulder (red) with matching accent colors
+- **Frosted-glass translucency** — the popover and window blend with what's behind them
+- **Zoom text** — ⌘= / ⌘- adjusts tab, title, and code font sizes in sync
 - **Code wrap** — toggle line wrapping for long snippets
-- **Resizable** — drag to adjust the width and height of the popover
-- **Appearance** — system, light, or dark mode
+- **Resizable** — drag any edge to adjust the window or popover
 - **Custom data folder** — store your snippets wherever you want
-- **Customizable font sizes** — separate controls for title and code
-- **Auto-update** — built-in update checker in Settings
+- **Auto-update** — built-in update checker
 
 ## Installation
 
@@ -43,21 +49,44 @@ Then go to **System Settings → Privacy & Security → Accessibility**, click *
 
 Prefer to do it manually? Download **Fetch.zip** from the [latest release](https://github.com/chungchihhan/fetch/releases/latest), unzip, drag to `/Applications`, and right-click → **Open** the first time.
 
+## Display Modes
+
+Choose in **Settings → General → Display Mode**:
+- **Both** — menu bar icon + Dock icon; popover and main window stay in sync
+- **Menu Bar Only** — classic menu bar popover, no Dock presence
+- **Window Only** — no menu bar icon; the main window is the app
+
 ## Keyboard Shortcuts
 
-| Shortcut  | Action |
-|-----------|--------|
-| ⌘⌥F       | Toggle Fetch (customizable in Settings) |
-| ⌘1 – ⌘6   | Switch tabs |
-| ↑ / ↓     | Navigate snippets |
-| Enter     | Copy focused snippet |
-| ⌘E        | Enter edit mode |
-| Tab       | Switch between title and code while editing |
-| Esc       | Cancel edit |
-| ⌘N        | New snippet |
-| ⌘C        | Copy focused snippet |
-| ⌘D        | Delete focused snippet |
-| ⌘,        | Open Settings |
+### Global
+| Shortcut | Action |
+|----------|--------|
+| ⌘⌥F      | Toggle Fetch (customizable in Settings) |
+
+### Browse
+| Shortcut   | Action |
+|------------|--------|
+| ⌘1 – ⌘6    | Switch tabs |
+| ↑ / ↓      | Navigate snippets |
+| ↵          | Copy code only |
+| ⌘C         | Copy title with code |
+| ⌘E         | Enter edit mode |
+| ⌘N         | New snippet |
+| ⌘D         | Delete focused snippet |
+| ⌥↑ / ⌥↓    | Reorder snippet up / down |
+| ⌘Z / ⌘⇧Z   | Undo / Redo |
+| ⌘= / ⌘-    | Increase / decrease text size |
+| ⌘,         | Open Settings |
+| Esc        | Close popover |
+
+### Edit
+| Shortcut     | Action |
+|--------------|--------|
+| Tab / ⇧Tab   | Switch between title and code |
+| ↵            | Save and exit |
+| Esc          | Save and exit |
+| ⇧↵           | Newline in code |
+| ⌘E           | Exit edit |
 
 ## License
 
