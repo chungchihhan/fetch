@@ -80,6 +80,18 @@ struct SnippetRowView: View {
     private var titleFontSize: CGFloat { CGFloat(storedTitleFontSize) }
 
     var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            GripHandle()
+                .opacity(isHovering || isFocused ? 0.55 : 0.25)
+                .draggable(snippet.id.uuidString) {
+                    GripHandle().opacity(0.8).padding(8)
+                }
+
+            rowBody
+        }
+    }
+
+    private var rowBody: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Title row
             HStack(spacing: 4) {
@@ -173,5 +185,25 @@ struct SnippetRowView: View {
         if isFocused { return Color(hex: "#78c9ab").opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
+    }
+}
+
+// Six-dot grip (2 columns × 3 rows) used as the drag handle.
+struct GripHandle: View {
+    var body: some View {
+        VStack(spacing: 2) {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: 2) {
+                    Circle().frame(width: 2.5, height: 2.5)
+                    Circle().frame(width: 2.5, height: 2.5)
+                }
+            }
+        }
+        .foregroundStyle(.primary)
+        .frame(width: 10)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
+        }
     }
 }

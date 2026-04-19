@@ -5,6 +5,7 @@ import Observation
 final class SnippetStore {
     var tabs: [[Snippet]] = Array(repeating: [], count: 6)
     var activeTab: Int = 0
+    var focusedIndex: Int? = nil
 
     private var storageDirectory: URL
 
@@ -32,6 +33,27 @@ final class SnippetStore {
         updated.removeAll { $0.id == id }
         tabs[tab] = updated                 // explicit set → reliable @Observable notification
         save(tab: tab)
+    }
+
+    /// Move the snippet at `from` so that it's inserted at `toOffset` in the same tab.
+    /// Follows SwiftUI `Array.move(fromOffsets:toOffset:)` semantics: `toOffset` is the
+    /// insertion slot in the array's original indexing. Adjacent offsets are a no-op.
+    @discardableResult
+    func moveSnippet(from: Int, toOffset: Int, tab: Int) -> Int? {
+        var updated = tabs[tab]
+        guard updated.indices.contains(from) else { return nil }
+        let clamped = max(0, min(updated.count, toOffset))
+        if clamped == from || clamped == from + 1 { return from }
+        updated.move(fromOffsets: IndexSet(integer: from), toOffset: clamped)
+        tabs[tab] = updated
+        save(tab: tab)
+        return from < clamped ? clamped - 1 : clamped
+    }
+
+    @discardableResult
+    func moveSnippet(id: UUID, toOffset: Int, tab: Int) -> Int? {
+        guard let from = tabs[tab].firstIndex(where: { $0.id == id }) else { return nil }
+        return moveSnippet(from: from, toOffset: toOffset, tab: tab)
     }
 
     func save(tab: Int) {
