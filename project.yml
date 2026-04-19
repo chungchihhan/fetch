@@ -32,7 +32,7 @@ targets:
       properties:
         CFBundleName: Fetch
         CFBundleVersion: "1"
-        CFBundleShortVersionString: "1.0.2"
+        CFBundleShortVersionString: "1.1.0"
 
   FetchTests:
     type: bundle.unit-test
