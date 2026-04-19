@@ -43,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .displayModeChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleClosePopover),
+            name: .closePopover,
+            object: nil
+        )
         applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
 
         if UserDefaults.standard.object(forKey: "fetchAutoCheckUpdates") as? Bool ?? true {
@@ -168,6 +174,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return mode == "windowOnly"
     }
 
+    @objc func handleClosePopover() {
+        if popover?.isShown == true {
+            popover.performClose(nil)
+        }
+    }
+
     @objc func handleDisplayModeChanged() {
         applyDisplayMode(UserDefaults.standard.string(forKey: "fetchDisplayMode") ?? "both")
     }
@@ -286,4 +298,5 @@ extension Notification.Name {
     static let widthChanged       = Notification.Name("FetchWidthChanged")
     static let iconStyleChanged   = Notification.Name("FetchIconStyleChanged")
     static let displayModeChanged = Notification.Name("FetchDisplayModeChanged")
+    static let closePopover       = Notification.Name("FetchClosePopover")
 }

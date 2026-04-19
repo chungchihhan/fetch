@@ -289,15 +289,16 @@ struct SnippetListView: View {
                 }
                 return true
 
-            case 53:                               // Esc — close popover
-                NotificationCenter.default.post(name: NSPopover.willCloseNotification, object: nil)
-                NSApp.hide(nil)
+            case 53:                               // Esc — close popover (main window ignores)
+                NotificationCenter.default.post(name: .closePopover, object: nil)
                 return true
 
-            case 8 where flags.contains(.command): // ⌘C — copy code
+            case 8 where flags.contains(.command): // ⌘C — copy title + code
                 if let i = store.focusedIndex, i < snippets.count {
+                    let s = snippets[i]
+                    let formatted = "# \(s.title)\n\(s.code)"
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
+                    NSPasteboard.general.setString(formatted, forType: .string)
                     postToast("Copied")
                 }
                 return true
