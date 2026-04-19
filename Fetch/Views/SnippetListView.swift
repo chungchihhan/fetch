@@ -200,6 +200,15 @@ struct SnippetListView: View {
 
             // ─── Edit mode ───────────────────────────────────────────────────
             if store.editStep > 0 {
+                // Don't interfere with IME composition (Chinese / Japanese / etc.).
+                // If the first responder (or its field editor) has marked text, let
+                // the IME process this keystroke — Enter/Esc/arrows drive candidate
+                // selection while composing.
+                if let responder = event.window?.firstResponder as? NSTextView,
+                   responder.hasMarkedText() {
+                    return false
+                }
+
                 switch event.keyCode {
 
                 case 14 where flags == .command:    // ⌘E — save and exit
