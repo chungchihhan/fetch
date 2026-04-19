@@ -1,24 +1,19 @@
 import SwiftUI
 import AppKit
 
-// Reference-type state so mutations from the key handler always propagate
+// View-local editing state. Focus index lives on SnippetStore so it syncs
+// across the popover and the main window.
 @Observable
 private final class ListNavState {
-    var focusedTab: Int = 0      // which tab the selection belongs to
-    var focusedIndex: Int? = nil
     var editStep: Int = 0        // 0=browse, 1=title edit, 2=code edit
     var cursorOnFirstLine: Bool = true
     var isEditing: Bool { editStep > 0 }
-
-    func setFocus(_ index: Int?, tab: Int) {
-        focusedTab = tab
-        focusedIndex = index
-    }
 }
 
 struct SnippetListView: View {
     @Environment(SnippetStore.self) var store
     @State private var nav = ListNavState()
+    @State private var dropTargetIndex: Int? = nil
 
     var snippets: [Snippet] { store.tabs[store.activeTab] }
 
@@ -40,18 +35,25 @@ struct SnippetListView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 10) {
-                            ForEach(Array(snippets.enumerated()), id: \.element.id) { i, _ in
+                            ForEach(Array(snippets.enumerated()), id: \.element.id) { i, snippet in
                                 SnippetRowView(
                                     snippet: binding(for: i),
-                                    isFocused: nav.focusedTab == store.activeTab && nav.focusedIndex == i,
-                                    editStep: nav.focusedTab == store.activeTab && nav.focusedIndex == i ? nav.editStep : 0,
+                                    isFocused: store.focusedIndex == i,
+                                    editStep: store.focusedIndex == i ? nav.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
                                     onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
                                 )
                                 .id(i)
+                                .overlay(alignment: .top) {
+                                    Rectangle()
+                                        .fill(Color(hex: "#78c9ab"))
+                                        .frame(height: 2)
+                                        .offset(y: -6)
+                                        .opacity(dropTargetIndex == i ? 1 : 0)
+                                }
                                 .onTapGesture {
-                                    nav.setFocus(i, tab: store.activeTab)
+                                    store.focusedIndex = i
                                     guard nav.editStep == 0 else { return }
                                     let snippets = store.tabs[store.activeTab]
                                     guard i < snippets.count else { return }
@@ -59,12 +61,43 @@ struct SnippetListView: View {
                                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                                     postToast("Copied")
                                 }
+                                .dropDestination(for: String.self) { items, _ in
+                                    dropTargetIndex = nil
+                                    guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
+                                    guard let newIndex = store.moveSnippet(id: src, toOffset: i, tab: store.activeTab) else { return false }
+                                    store.focusedIndex = newIndex
+                                    return true
+                                } isTargeted: { targeted in
+                                    if targeted { dropTargetIndex = i }
+                                    else if dropTargetIndex == i { dropTargetIndex = nil }
+                                }
                             }
+
+                            // Drop here to move the dragged snippet to the end.
+                            Color.clear
+                                .frame(height: 24)
+                                .contentShape(Rectangle())
+                                .overlay(alignment: .top) {
+                                    Rectangle()
+                                        .fill(Color(hex: "#78c9ab"))
+                                        .frame(height: 2)
+                                        .opacity(dropTargetIndex == snippets.count ? 1 : 0)
+                                }
+                                .dropDestination(for: String.self) { items, _ in
+                                    dropTargetIndex = nil
+                                    guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
+                                    guard let newIndex = store.moveSnippet(id: src, toOffset: snippets.count, tab: store.activeTab) else { return false }
+                                    store.focusedIndex = newIndex
+                                    return true
+                                } isTargeted: { targeted in
+                                    if targeted { dropTargetIndex = snippets.count }
+                                    else if dropTargetIndex == snippets.count { dropTargetIndex = nil }
+                                }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                     }
-                    .onChange(of: nav.focusedIndex) { _, idx in
+                    .onChange(of: store.focusedIndex) { _, idx in
                         if let idx { proxy.scrollTo(idx, anchor: .center) }
                     }
                 }
@@ -74,12 +107,11 @@ struct SnippetListView: View {
             nav.editStep = 0
             nav.cursorOnFirstLine = true
             let tabSnippets = store.tabs[newTab]
-            nav.setFocus(tabSnippets.isEmpty ? nil : 0, tab: newTab)
+            store.focusedIndex = tabSnippets.isEmpty ? nil : 0
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidOpen)) { _ in
-            let tab = store.activeTab
-            if nav.focusedIndex == nil, !snippets.isEmpty {
-                nav.setFocus(0, tab: tab)
+            if store.focusedIndex == nil, !snippets.isEmpty {
+                store.focusedIndex = 0
             }
         }
     }
@@ -107,14 +139,14 @@ struct SnippetListView: View {
 
 
             func enterEdit() {
-                if nav.focusedIndex == nil, !snippets.isEmpty { nav.setFocus(0, tab: tab) }
-                guard nav.focusedIndex != nil else { return }
+                if store.focusedIndex == nil, !snippets.isEmpty { store.focusedIndex = 0 }
+                guard store.focusedIndex != nil else { return }
                 nav.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
             }
 
             func exitEdit(copy: Bool) {
-                if copy, let i = nav.focusedIndex, i < snippets.count {
+                if copy, let i = store.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                     postToast("Copied")
@@ -171,7 +203,7 @@ struct SnippetListView: View {
             switch event.keyCode {
 
             case 36:                                // Enter — copy focused snippet code
-                if let i = nav.focusedIndex, i < snippets.count {
+                if let i = store.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                     postToast("Copied")
@@ -181,17 +213,31 @@ struct SnippetListView: View {
             case 14 where flags == .command:        // ⌘E — enter edit mode
                 enterEdit(); return true
 
+            case 125 where flags.contains(.option): // ⌥↓ — move focused snippet down
+                if let i = store.focusedIndex, i < snippets.count - 1,
+                   let newIndex = store.moveSnippet(from: i, toOffset: i + 2, tab: tab) {
+                    store.focusedIndex = newIndex
+                }
+                return true
+
+            case 126 where flags.contains(.option): // ⌥↑ — move focused snippet up
+                if let i = store.focusedIndex, i > 0,
+                   let newIndex = store.moveSnippet(from: i, toOffset: i - 1, tab: tab) {
+                    store.focusedIndex = newIndex
+                }
+                return true
+
             case 125:                               // ↓ — next snippet
                 if !snippets.isEmpty {
-                    let current = nav.focusedIndex ?? -1
-                    nav.setFocus(max(0, min(snippets.count - 1, current + 1)), tab: tab)
+                    let current = store.focusedIndex ?? -1
+                    store.focusedIndex = max(0, min(snippets.count - 1, current + 1))
                 }
                 return true
 
             case 126:                               // ↑ — prev snippet
                 if !snippets.isEmpty {
-                    let current = nav.focusedIndex ?? snippets.count
-                    nav.setFocus(max(0, min(snippets.count - 1, current - 1)), tab: tab)
+                    let current = store.focusedIndex ?? snippets.count
+                    store.focusedIndex = max(0, min(snippets.count - 1, current - 1))
                 }
                 return true
 
@@ -201,7 +247,7 @@ struct SnippetListView: View {
                 return true
 
             case 8 where flags.contains(.command): // ⌘C — copy code
-                if let i = nav.focusedIndex, i < snippets.count {
+                if let i = store.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                     postToast("Copied")
@@ -210,15 +256,15 @@ struct SnippetListView: View {
 
             case 45 where flags.contains(.command): // ⌘N — new snippet
                 store.addSnippet()
-                nav.setFocus(store.tabs[tab].count - 1, tab: tab)
+                store.focusedIndex = store.tabs[tab].count - 1
                 enterEdit()
                 return true
 
             case 2 where flags.contains(.command): // ⌘D — delete
-                if let i = nav.focusedIndex, i < snippets.count {
+                if let i = store.focusedIndex, i < snippets.count {
                     store.deleteSnippet(id: snippets[i].id, tab: tab)
                     let remaining = store.tabs[tab]
-                    nav.setFocus(remaining.isEmpty ? nil : max(0, i - 1), tab: tab)
+                    store.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
                     postToast("Deleted")
                 }
                 return true
