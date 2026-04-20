@@ -166,9 +166,10 @@ struct SnippetListView: View {
 
 
             func enterEdit() {
-                if store.focusedIndex == nil, !snippets.isEmpty { store.focusedIndex = 0 }
-                guard let i = store.focusedIndex, i < snippets.count else { return }
-                store.editSnapshot = snippets[i]
+                let current = store.tabs[store.activeTab]
+                if store.focusedIndex == nil, !current.isEmpty { store.focusedIndex = 0 }
+                guard let i = store.focusedIndex, i < current.count else { return }
+                store.editSnapshot = current[i]
                 store.editStep = 1
                 NotificationCenter.default.post(name: .editModeChanged, object: true)
             }
