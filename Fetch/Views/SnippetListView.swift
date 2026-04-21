@@ -61,7 +61,15 @@ struct SnippetListView: View {
                                     editStep: store.focusedIndex == i ? store.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
-                                    onCursorFirstLine: { nav.cursorOnFirstLine = $0 }
+                                    onCursorFirstLine: { nav.cursorOnFirstLine = $0 },
+                                    onEnterEdit: {
+                                        store.focusedIndex = i
+                                        let current = store.tabs[store.activeTab]
+                                        guard i < current.count else { return }
+                                        store.editSnapshot = current[i]
+                                        store.editStep = 1
+                                        NotificationCenter.default.post(name: .editModeChanged, object: true)
+                                    }
                                 )
                                 .id(i)
                                 .overlay(alignment: .top) {
