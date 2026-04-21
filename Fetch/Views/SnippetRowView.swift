@@ -67,6 +67,7 @@ struct SnippetRowView: View {
     var onTitleChange: (String) -> Void
     var onCodeChange: (String) -> Void
     var onCursorFirstLine: ((Bool) -> Void)? = nil
+    var onEnterEdit: () -> Void = {}
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
@@ -130,17 +131,7 @@ struct SnippetRowView: View {
                         .foregroundStyle(.primary.opacity(isFocused ? 0.90 : 0.60))
                     Spacer(minLength: 0)
                     if isFocused {
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(snippet.code, forType: .string)
-                            NotificationCenter.default.post(name: .toastMessage, object: "Copied")
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.primary.opacity(0.45))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Copy code")
+                        EditIconButton(action: onEnterEdit)
                     }
                 }
             }
@@ -198,6 +189,49 @@ struct SnippetRowView: View {
         if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
+    }
+}
+
+private struct EditIconButton: View {
+    var action: () -> Void
+    @State private var isHovering = false
+    @State private var didFire = false
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
+
+    var body: some View {
+        Image(systemName: "square.and.pencil")
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(
+                isHovering
+                    ? Color.styleAccent(colorScheme, style: iconStyle)
+                    : .primary.opacity(0.50)
+            )
+            .shadow(
+                color: isHovering
+                    ? Color.styleAccent(colorScheme, style: iconStyle).opacity(0.6)
+                    : .clear,
+                radius: 4
+            )
+            .scaleEffect(isHovering ? 1.18 : 1.0)
+            .animation(.easeInOut(duration: 0.18), value: isHovering)
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
+            .help("Edit snippet (⌘E)")
+            .onHover { hovering in
+                isHovering = hovering
+                if hovering { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !didFire {
+                            didFire = true
+                            action()
+                        }
+                    }
+                    .onEnded { _ in didFire = false }
+            )
     }
 }
 
