@@ -329,12 +329,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 240),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Settings"
         window.isReleasedWhenClosed = false
+        window.titlebarAppearsTransparent = true
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.contentViewController = NSHostingController(
             rootView: SettingsView().environment(store)
         )
@@ -342,6 +345,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        // SwiftUI may resize the window after the initial center() runs; re-center
+        // once layout settles so the window stays on screen center.
+        DispatchQueue.main.async { window.center() }
         settingsWindow = window
     }
 
