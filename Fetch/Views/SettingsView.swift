@@ -24,15 +24,26 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
-            shortcutsTab
-                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
-            aboutTab
-                .tabItem { Label("About", systemImage: "info.circle") }
+        ZStack {
+            // Explicit frosted backdrop — avoids relying on SwiftUI's default
+            // TabView chrome, which renders inconsistently across macOS versions
+            // and window styles (glass in some builds, plain in others).
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.55)
+                .ignoresSafeArea()
+
+            TabView {
+                generalTab
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                shortcutsTab
+                    .tabItem { Label("Shortcuts", systemImage: "keyboard") }
+                aboutTab
+                    .tabItem { Label("About", systemImage: "info.circle") }
+            }
+            .frame(width: 400)
         }
-        .frame(width: 400)
         .onChange(of: colorSchemeKey) { _, newValue in
             (NSApp.delegate as? AppDelegate)?.applyAppearance(newValue)
         }

@@ -131,9 +131,21 @@ struct SnippetListView: View {
                     }
                 }
             }
+
+            if let idx = store.pendingDeleteIndex, idx < snippets.count {
+                DeleteConfirmOverlay(
+                    title: snippets[idx].title,
+                    onConfirm: {
+                        performDelete(at: idx, store: store, tab: store.activeTab)
+                        store.pendingDeleteIndex = nil
+                    },
+                    onCancel: { store.pendingDeleteIndex = nil }
+                )
+            }
         }
         .onChange(of: store.activeTab) { _, newTab in
             store.editStep = 0
+            store.pendingDeleteIndex = nil
             nav.cursorOnFirstLine = true
             let tabSnippets = store.tabs[newTab]
             store.focusedIndex = tabSnippets.isEmpty ? nil : 0
@@ -205,6 +217,23 @@ struct SnippetListView: View {
                 store.editStep = 0
                 store.save(tab: tab)
                 NotificationCenter.default.post(name: .editModeChanged, object: false)
+            }
+
+            // ─── Delete confirmation overlay ─────────────────────────────────
+            if let idx = store.pendingDeleteIndex {
+                switch event.keyCode {
+                case 36: // ↵ — confirm
+                    if idx < store.tabs[tab].count {
+                        performDelete(at: idx, store: store, tab: tab)
+                    }
+                    store.pendingDeleteIndex = nil
+                    return true
+                case 53: // Esc — cancel
+                    store.pendingDeleteIndex = nil
+                    return true
+                default:
+                    return true // swallow everything else while confirming
+                }
             }
 
             // ─── Edit mode ───────────────────────────────────────────────────
@@ -331,19 +360,10 @@ struct SnippetListView: View {
                 if let i = store.focusedIndex, i < snippets.count {
                     let confirm = (UserDefaults.standard.object(forKey: "fetchConfirmDelete") as? Bool) ?? true
                     if confirm {
-                        let title = snippets[i].title.isEmpty ? "Untitled" : snippets[i].title
-                        let alert = NSAlert()
-                        alert.messageText = "Delete \"\(title)\"?"
-                        alert.informativeText = "You can undo with ⌘Z."
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: "Delete")
-                        alert.addButton(withTitle: "Cancel")
-                        guard alert.runModal() == .alertFirstButtonReturn else { return true }
+                        store.pendingDeleteIndex = i
+                    } else {
+                        performDelete(at: i, store: store, tab: tab)
                     }
-                    store.deleteSnippet(id: snippets[i].id, tab: tab)
-                    let remaining = store.tabs[tab]
-                    store.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
-                    postToast("Deleted")
                 }
                 return true
 
@@ -417,6 +437,68 @@ extension Notification.Name {
     static let toastMessage    = Notification.Name("FetchToastMessage")
     static let openSettings    = Notification.Name("FetchOpenSettings")
     static let shortcutChanged = Notification.Name("FetchShortcutChanged")
+}
+
+struct DeleteConfirmOverlay: View {
+    let title: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { onCancel() }
+
+            VStack(spacing: 12) {
+                Text("Delete \"\(title.isEmpty ? "Untitled" : title)\"?")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(spacing: 3) {
+                        Button("Cancel", action: onCancel)
+                            .keyboardShortcut(.cancelAction)
+                        Text("(esc)")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(spacing: 3) {
+                        Button("Delete", action: onConfirm)
+                            .keyboardShortcut(.defaultAction)
+                            .tint(.red)
+                        Text("(enter)")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .controlSize(.small)
+            }
+            .padding(18)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+    }
+}
+
+private func performDelete(at i: Int, store: SnippetStore, tab: Int) {
+    let snippets = store.tabs[tab]
+    guard i < snippets.count else { return }
+    store.deleteSnippet(id: snippets[i].id, tab: tab)
+    let remaining = store.tabs[tab]
+    store.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
+    postToast("Deleted")
 }
 
 private func postToast(_ message: String) {

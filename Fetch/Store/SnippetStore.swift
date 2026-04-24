@@ -8,6 +8,7 @@ final class SnippetStore {
     var focusedIndex: Int? = nil
     var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
     var editSnapshot: Snippet? = nil   // snapshot taken when edit begins, used for undo
+    var pendingDeleteIndex: Int? = nil // non-nil = confirm-delete overlay is up
 
     let undoManager = UndoManager()
 
