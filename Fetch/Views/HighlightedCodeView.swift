@@ -56,6 +56,27 @@ struct HighlightedCodeView: NSViewRepresentable {
         scrollView.horizontalScrollElasticity = .none
         scrollView.verticalScrollElasticity = .none
 
+        // Keep text view width glued to the clip view while wrapping is on.
+        // The popover hides/reshows its hosting controller without calling
+        // updateNSView, so we need AppKit-side sync for the frame too.
+        scrollView.contentView.postsFrameChangedNotifications = true
+        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak textView, weak scrollView] _ in
+            guard let textView, let scrollView,
+                  textView.textContainer?.widthTracksTextView == true else { return }
+            let w = scrollView.contentView.bounds.width
+            guard w > 0, abs(textView.frame.size.width - w) > 0.5 else { return }
+            textView.frame.size.width = w
+            textView.textContainer?.size = NSSize(width: w, height: .greatestFiniteMagnitude)
+            textView.layoutManager?.invalidateLayout(
+                forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
+                actualCharacterRange: nil
+            )
+        }
+
         return scrollView
     }
 
@@ -68,22 +89,25 @@ struct HighlightedCodeView: NSViewRepresentable {
             Self.currentTheme = theme
         }
 
-        // Sync wrap mode
-        let currentlyWrapping = textView.textContainer?.widthTracksTextView ?? false
-        if currentlyWrapping != wrapCode {
-            textView.textContainer?.widthTracksTextView = wrapCode
-            textView.isHorizontallyResizable = !wrapCode
-            textView.autoresizingMask = wrapCode ? [.width] : []
-            if wrapCode {
-                let clipWidth = scrollView.contentView.bounds.width
-                let w = clipWidth > 0 ? clipWidth : 300
+        // Sync wrap mode. Apply every update (idempotent) so that reopening the
+        // popover or resizing re-hydrates the wrap state even if no prop changed.
+        let wasWrapping = textView.textContainer?.widthTracksTextView ?? false
+        textView.textContainer?.widthTracksTextView = wrapCode
+        textView.isHorizontallyResizable = !wrapCode
+        textView.autoresizingMask = wrapCode ? [.width] : []
+        if wrapCode {
+            let clipWidth = scrollView.contentView.bounds.width
+            let w = clipWidth > 0 ? clipWidth : max(textView.frame.width, 300)
+            if abs(textView.frame.size.width - w) > 0.5 {
                 textView.frame.size.width = w
-                textView.textContainer?.size = NSSize(width: w,
-                                                      height: CGFloat.greatestFiniteMagnitude)
-            } else {
-                textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
-                                                      height: CGFloat.greatestFiniteMagnitude)
             }
+            textView.textContainer?.size = NSSize(width: w,
+                                                  height: CGFloat.greatestFiniteMagnitude)
+        } else {
+            textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                                  height: CGFloat.greatestFiniteMagnitude)
+        }
+        if wasWrapping != wrapCode {
             textView.layoutManager?.invalidateLayout(
                 forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
                 actualCharacterRange: nil
@@ -180,6 +204,13 @@ struct HighlightedCodeView: NSViewRepresentable {
         var wasCodeFocused: Bool = false
         var renderedTheme: String = ""
         var onHeightChange: ((CGFloat) -> Void)?
+        var frameObserver: NSObjectProtocol?
+
+        deinit {
+            if let frameObserver {
+                NotificationCenter.default.removeObserver(frameObserver)
+            }
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
