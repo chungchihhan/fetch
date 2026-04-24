@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("fetchAutoCheckUpdates") private var autoCheckUpdates: Bool = true
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @AppStorage("fetchDisplayMode") private var displayMode: String = "both"
+    @AppStorage("fetchConfirmDelete") private var confirmDelete: Bool = true
     @State private var updater = Updater.shared
 
     private var displayPath: String {
@@ -230,6 +231,23 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 32, alignment: .leading)
                     }
+                }
+
+                sectionHeader("Behavior")
+
+                settingRow {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Confirm Before Delete")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Text("Ask to confirm when pressing ⌘D")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $confirmDelete)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
 
                 sectionHeader("System")

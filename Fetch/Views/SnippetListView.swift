@@ -329,6 +329,17 @@ struct SnippetListView: View {
 
             case 2 where flags.contains(.command): // ⌘D — delete
                 if let i = store.focusedIndex, i < snippets.count {
+                    let confirm = (UserDefaults.standard.object(forKey: "fetchConfirmDelete") as? Bool) ?? true
+                    if confirm {
+                        let title = snippets[i].title.isEmpty ? "Untitled" : snippets[i].title
+                        let alert = NSAlert()
+                        alert.messageText = "Delete \"\(title)\"?"
+                        alert.informativeText = "You can undo with ⌘Z."
+                        alert.alertStyle = .warning
+                        alert.addButton(withTitle: "Delete")
+                        alert.addButton(withTitle: "Cancel")
+                        guard alert.runModal() == .alertFirstButtonReturn else { return true }
+                    }
                     store.deleteSnippet(id: snippets[i].id, tab: tab)
                     let remaining = store.tabs[tab]
                     store.focusedIndex = remaining.isEmpty ? nil : max(0, i - 1)
