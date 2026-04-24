@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var mainWindow: NSWindow?
     var hotKeyManager: HotKeyManager?
     var eventMonitor: Any?
+    private var updateCheckTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
@@ -52,10 +53,127 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
 
         if UserDefaults.standard.object(forKey: "fetchAutoCheckUpdates") as? Bool ?? true {
-            Task.detached { [weak self] in
+            Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await Updater.shared.checkForUpdates(silent: true)
-                _ = self
+                await self?.runUpdateCheck()
+            }
+            startUpdateCheckTimer()
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self,
+                selector: #selector(handleSystemWake),
+                name: NSWorkspace.didWakeNotification,
+                object: nil
+            )
+        }
+    }
+
+    // Re-check daily while the app is running so long-lived sessions
+    // still hear about new releases without the user quitting.
+    private func startUpdateCheckTimer() {
+        updateCheckTimer?.invalidate()
+        let timer = Timer(timeInterval: 86_400, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.runUpdateCheck() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        updateCheckTimer = timer
+    }
+
+    @objc private func openProjectPage() {
+        if let url = URL(string: "https://github.com/chungchihhan/fetch") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func makeStarAccessoryView() -> NSView {
+        let button = HoverLinkButton()
+        let starAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.systemYellow,
+            .font: NSFont.systemFont(ofSize: 18, weight: .semibold),
+            .baselineOffset: -2
+        ]
+        let textAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.labelColor,
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold)
+        ]
+        let title = NSMutableAttributedString()
+        title.append(NSAttributedString(string: "★  ", attributes: starAttrs))
+        title.append(NSAttributedString(string: "Star the project to support me", attributes: textAttrs))
+        button.attributedTitle = title
+        button.target = self
+        button.action = #selector(openProjectPage)
+        button.sizeToFit()
+
+        // Expand the frame so the title has breathing room; NSButton centers its
+        // label inside whatever frame we give it.
+        let hPad: CGFloat = 18
+        let vPad: CGFloat = 6
+        button.frame = NSRect(
+            x: 0, y: 0,
+            width: button.frame.width + hPad * 2,
+            height: button.frame.height + vPad * 2
+        )
+
+        // Center the button inside a wider container so NSAlert lays it out nicely.
+        let container = NSView(frame: NSRect(
+            x: 0, y: 0,
+            width: max(300, button.frame.width),
+            height: button.frame.height + 6
+        ))
+        button.frame.origin.x = (container.bounds.width - button.frame.width) / 2
+        button.frame.origin.y = 3
+        container.addSubview(button)
+        return container
+    }
+
+    @objc private func handleSystemWake() {
+        Task { @MainActor [weak self] in
+            // Delay so we don't prompt the instant the user opens the lid —
+            // wait for them to settle in and for the network to stabilize.
+            try? await Task.sleep(nanoseconds: 300_000_000_000)
+            await self?.runUpdateCheck()
+        }
+    }
+
+    @MainActor
+    private func runUpdateCheck() async {
+        await Updater.shared.checkForUpdates(silent: true)
+        guard Updater.shared.updateAvailable,
+              let latest = Updater.shared.latestVersion else { return }
+        // Respect "Later" — don't re-nag for the same version until a newer
+        // one is released.
+        let skipped = UserDefaults.standard.string(forKey: "fetchSkippedUpdateVersion") ?? ""
+        if skipped == latest { return }
+        promptForUpdate()
+    }
+
+    @MainActor
+    private func promptForUpdate() {
+        guard let version = Updater.shared.latestVersion else { return }
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Fetch \(version) is available"
+        alert.informativeText = "You're on v\(Updater.shared.currentVersion). Update now? Fetch will quit and reopen when done."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Update Now")
+        alert.addButton(withTitle: "Skip")
+        alert.accessoryView = makeStarAccessoryView()
+
+        if alert.runModal() != .alertFirstButtonReturn {
+            UserDefaults.standard.set(version, forKey: "fetchSkippedUpdateVersion")
+            return
+        }
+
+        Updater.shared.installUpdate { success in
+            if success {
+                Updater.shared.relaunch()
+            } else {
+                let err = NSAlert()
+                err.messageText = "Update failed"
+                err.informativeText = Updater.shared.statusMessage
+                err.alertStyle = .warning
+                err.addButton(withTitle: "OK")
+                err.runModal()
             }
         }
     }
@@ -299,4 +417,53 @@ extension Notification.Name {
     static let iconStyleChanged   = Notification.Name("FetchIconStyleChanged")
     static let displayModeChanged = Notification.Name("FetchDisplayModeChanged")
     static let closePopover       = Notification.Name("FetchClosePopover")
+}
+
+// NSButton variant with a soft yellow capsule that brightens on hover.
+// Used as the "Star the project" link in the update prompt.
+private final class HoverLinkButton: NSButton {
+    private var trackingArea: NSTrackingArea?
+    private let cornerRadius: CGFloat = 10
+    private static let restingColor = NSColor.systemYellow.withAlphaComponent(0.14).cgColor
+    private static let hoverColor   = NSColor.systemYellow.withAlphaComponent(0.28).cgColor
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonSetup()
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        commonSetup()
+    }
+
+    private func commonSetup() {
+        wantsLayer = true
+        isBordered = false
+        bezelStyle = .inline
+        layer?.cornerRadius = cornerRadius
+        layer?.backgroundColor = Self.restingColor
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea { removeTrackingArea(existing) }
+        let ta = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(ta)
+        trackingArea = ta
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        NSCursor.pointingHand.push()
+        layer?.backgroundColor = Self.hoverColor
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.pop()
+        layer?.backgroundColor = Self.restingColor
+    }
 }

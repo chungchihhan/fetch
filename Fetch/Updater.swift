@@ -60,7 +60,7 @@ final class Updater {
     }
 
     @MainActor
-    func installUpdate() {
+    func installUpdate(completion: ((Bool) -> Void)? = nil) {
         guard !isInstalling else { return }
         isInstalling = true
         statusMessage = "Downloading and installing…"
@@ -80,12 +80,14 @@ final class Updater {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isInstalling = false
-                if proc.terminationStatus == 0 {
+                let success = proc.terminationStatus == 0
+                if success {
                     self.updateReady = true
                     self.statusMessage = "Update ready. Relaunch to apply."
                 } else {
                     self.statusMessage = "Install failed (exit \(proc.terminationStatus))"
                 }
+                completion?(success)
             }
         }
 
@@ -94,6 +96,7 @@ final class Updater {
         } catch {
             isInstalling = false
             statusMessage = "Failed to run installer"
+            completion?(false)
         }
     }
 
