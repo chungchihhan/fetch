@@ -61,7 +61,15 @@ struct SnippetListView: View {
                                     editStep: store.focusedIndex == i ? store.editStep : 0,
                                     onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
                                     onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
-                                    onCursorFirstLine: { nav.cursorOnFirstLine = $0 },
+                                    onCursorFirstLine: { isFirst in
+                                        nav.cursorOnFirstLine = isFirst
+                                        // The code's selection only changes
+                                        // while editing; if it does and we're
+                                        // still in title-edit mode, the user
+                                        // clicked into the code — promote to
+                                        // code-edit so ↑↓ navigate within it.
+                                        if store.editStep == 1 { store.editStep = 2 }
+                                    },
                                     onEnterEdit: {
                                         store.focusedIndex = i
                                         let current = store.tabs[store.activeTab]

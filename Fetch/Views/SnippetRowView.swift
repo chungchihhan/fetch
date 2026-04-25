@@ -71,7 +71,6 @@ struct SnippetRowView: View {
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
-    @State private var wrappedCodeHeight: CGFloat = 32
     @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
     @AppStorage("fetchFontSize") private var storedFontSize: Double = 11
     @AppStorage("fetchTitleFontSize") private var storedTitleFontSize: Double = 11
@@ -112,7 +111,9 @@ struct SnippetRowView: View {
 
     private var rowContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Title row
+            // Title row. Pin the row height so the title doesn't shrink
+            // when entering edit (the EditIconButton is 20pt; the text field
+            // would otherwise size to its font height ≈ 15pt).
             HStack(spacing: 4) {
                 Text("#")
                     .font(.system(size: titleFontSize, design: .monospaced))
@@ -124,7 +125,6 @@ struct SnippetRowView: View {
                         isFocused: editStep == 1,
                         fontSize: titleFontSize
                     )
-                    .frame(height: titleFontSize * 1.4)
                 } else {
                     Text(snippet.title.isEmpty ? "Untitled" : snippet.title)
                         .font(.system(size: titleFontSize, design: .monospaced))
@@ -135,8 +135,10 @@ struct SnippetRowView: View {
                     }
                 }
             }
+            .frame(minHeight: max(20, titleFontSize * 1.6))
 
-            // Code block
+            // Code block. In wrap mode the view returns its natural height
+            // via sizeThatFits; in non-wrap mode we cap it at 5 explicit lines.
             HighlightedCodeView(
                 code: snippet.code,
                 language: snippet.language,
@@ -145,13 +147,9 @@ struct SnippetRowView: View {
                 wrapCode: codeWrap,
                 fontSize: fontSize,
                 onCodeChange: isEditing ? onCodeChange : nil,
-                onCursorFirstLine: onCursorFirstLine,
-                onHeightChange: codeWrap ? { wrappedCodeHeight = $0 } : nil
+                onCursorFirstLine: onCursorFirstLine
             )
-            .frame(height: codeWrap ? max(codeViewHeight, wrappedCodeHeight) : codeViewHeight)
-            .onChange(of: codeWrap) { _, wrap in
-                if wrap { wrappedCodeHeight = codeViewHeight }
-            }
+            .frame(height: codeWrap ? nil : codeViewHeight)
             .padding(7)
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))
