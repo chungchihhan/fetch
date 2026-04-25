@@ -174,12 +174,40 @@ struct HighlightedCodeView: NSViewRepresentable {
                 let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
                 result.addAttribute(.font, value: font,
                                     range: NSRange(location: 0, length: result.length))
+                Self.boostCommentContrast(in: result, dark: colorScheme == .dark)
                 textView.textStorage?.setAttributedString(result)
                 coord.renderedTheme = theme
             } else {
                 textView.string = code
                 textView.textColor = .labelColor
                 coord.renderedTheme = theme
+            }
+        }
+    }
+
+    // atom-one-dark uses #5C6370 for comments and atom-one-light uses #A0A1A7;
+    // both are too low-contrast against our frosted-glass backdrop. Find any
+    // run of foreground color matching the theme's comment color and replace
+    // with a more readable gray.
+    private static func boostCommentContrast(in str: NSMutableAttributedString, dark: Bool) {
+        let original: (CGFloat, CGFloat, CGFloat)
+        let replacement: NSColor
+        if dark {
+            original = (0x5C / 255.0, 0x63 / 255.0, 0x70 / 255.0)
+            replacement = NSColor(srgbRed: 0x96 / 255.0, green: 0x9F / 255.0,
+                                  blue: 0xAE / 255.0, alpha: 1.0)
+        } else {
+            original = (0xA0 / 255.0, 0xA1 / 255.0, 0xA7 / 255.0)
+            replacement = NSColor(srgbRed: 0x6B / 255.0, green: 0x6E / 255.0,
+                                  blue: 0x78 / 255.0, alpha: 1.0)
+        }
+        let fullRange = NSRange(location: 0, length: str.length)
+        str.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+            guard let color = (value as? NSColor)?.usingColorSpace(.sRGB) else { return }
+            if abs(color.redComponent   - original.0) < 0.01,
+               abs(color.greenComponent - original.1) < 0.01,
+               abs(color.blueComponent  - original.2) < 0.01 {
+                str.addAttribute(.foregroundColor, value: replacement, range: range)
             }
         }
     }
