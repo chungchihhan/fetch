@@ -10,7 +10,6 @@ struct HighlightedCodeView: NSViewRepresentable {
     var fontSize: CGFloat = 11
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
-    var onHeightChange: ((CGFloat) -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -19,13 +18,22 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     private var theme: String { colorScheme == .dark ? "atom-one-dark" : "atom-one-light" }
 
+    // Insets we apply on the NSTextView; the wrapping width is
+    // proposedWidth - 2*containerInset.x - 2*lineFragmentPadding.
+    private static let containerInsetX: CGFloat = 2
+    private static let containerInsetY: CGFloat = 2
+    private static let lineFragmentPadding: CGFloat = 5  // NSTextContainer default
+
     func makeNSView(context: Context) -> NSScrollView {
         let textView = PointerCursorTextView()
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.isRichText = false
         textView.isSelectable = false
         textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 2, height: 2)
+        textView.textContainerInset = NSSize(
+            width: Self.containerInsetX,
+            height: Self.containerInsetY
+        )
         textView.font = font
         textView.textColor = .labelColor
         textView.insertionPointColor = .labelColor
@@ -35,7 +43,7 @@ struct HighlightedCodeView: NSViewRepresentable {
         ]
         textView.delegate = context.coordinator
 
-        // No line-wrapping
+        // Default to non-wrapping; updateNSView reconfigures when wrapCode is on.
         textView.textContainer?.widthTracksTextView = false
         textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
                                               height: CGFloat.greatestFiniteMagnitude)
@@ -56,65 +64,66 @@ struct HighlightedCodeView: NSViewRepresentable {
         scrollView.horizontalScrollElasticity = .none
         scrollView.verticalScrollElasticity = .none
 
-        // Keep text view width glued to the clip view while wrapping is on.
-        // The popover hides/reshows its hosting controller without calling
-        // updateNSView, so we need AppKit-side sync for the frame too.
-        scrollView.contentView.postsFrameChangedNotifications = true
-        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
-            forName: NSView.frameDidChangeNotification,
-            object: scrollView.contentView,
-            queue: .main
-        ) { [weak textView, weak scrollView] _ in
-            guard let textView, let scrollView,
-                  textView.textContainer?.widthTracksTextView == true else { return }
-            let w = scrollView.contentView.bounds.width
-            guard w > 0, abs(textView.frame.size.width - w) > 0.5 else { return }
-            textView.frame.size.width = w
-            textView.textContainer?.size = NSSize(width: w, height: .greatestFiniteMagnitude)
-            textView.layoutManager?.invalidateLayout(
-                forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
-                actualCharacterRange: nil
-            )
-        }
-
         return scrollView
+    }
+
+    // SwiftUI asks for our height given a proposed width. In wrap mode we
+    // return the natural wrapped content height — covers both browse and
+    // edit; while editing the row grows with whatever the user types,
+    // because each keystroke re-runs the SwiftUI body with new `code` and
+    // SwiftUI re-asks sizeThatFits. In non-wrap mode we return nil so the
+    // parent's .frame(height:) drives the size.
+    func sizeThatFits(_ proposal: ProposedViewSize,
+                      nsView: NSScrollView,
+                      context: Context) -> CGSize? {
+        guard wrapCode,
+              let proposedWidth = proposal.width,
+              proposedWidth > 1 else {
+            return nil
+        }
+        let usable = max(
+            1,
+            proposedWidth - 2 * Self.containerInsetX - 2 * Self.lineFragmentPadding
+        )
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let attr = NSAttributedString(string: code, attributes: [.font: font])
+        let rect = attr.boundingRect(
+            with: NSSize(width: usable, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+        let h = max(16, ceil(rect.height) + 2 * Self.containerInsetY)
+        return CGSize(width: proposedWidth, height: h)
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
 
-        // Sync highlight theme with current appearance (shared Highlightr singleton)
+        // Sync highlight theme with current appearance (shared singleton).
         if Self.currentTheme != theme {
             Self.highlightr?.setTheme(to: theme)
             Self.currentTheme = theme
         }
 
-        // Sync wrap mode. Apply every update (idempotent) so that reopening the
-        // popover or resizing re-hydrates the wrap state even if no prop changed.
+        // Sync wrap mode. Only mutate AppKit state when something actually
+        // changed; re-setting the same values triggers layout invalidation.
         let wasWrapping = textView.textContainer?.widthTracksTextView ?? false
-        textView.textContainer?.widthTracksTextView = wrapCode
-        textView.isHorizontallyResizable = !wrapCode
-        textView.autoresizingMask = wrapCode ? [.width] : []
-        if wrapCode {
-            let clipWidth = scrollView.contentView.bounds.width
-            let w = clipWidth > 0 ? clipWidth : max(textView.frame.width, 300)
-            if abs(textView.frame.size.width - w) > 0.5 {
-                textView.frame.size.width = w
-            }
-            textView.textContainer?.size = NSSize(width: w,
-                                                  height: CGFloat.greatestFiniteMagnitude)
-        } else {
-            textView.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude,
-                                                  height: CGFloat.greatestFiniteMagnitude)
-        }
-        if wasWrapping != wrapCode {
+        let wrapChanged = wasWrapping != wrapCode
+        if wrapChanged {
+            textView.textContainer?.widthTracksTextView = wrapCode
+            textView.isHorizontallyResizable = !wrapCode
+            textView.autoresizingMask = wrapCode ? [.width] : []
+            textView.textContainer?.size = wrapCode
+                ? NSSize(width: scrollView.contentView.bounds.width,
+                         height: CGFloat.greatestFiniteMagnitude)
+                : NSSize(width: CGFloat.greatestFiniteMagnitude,
+                         height: CGFloat.greatestFiniteMagnitude)
             textView.layoutManager?.invalidateLayout(
                 forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
                 actualCharacterRange: nil
             )
         }
 
-        // Sync font size
+        // Sync font size.
         let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         if textView.font != font {
             textView.font = font
@@ -123,7 +132,8 @@ struct HighlightedCodeView: NSViewRepresentable {
 
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
-        coord.onHeightChange = onHeightChange
+        coord.onCursorFirstLine = onCursorFirstLine
+
         if textView.isEditable != isEditing {
             textView.isEditable = isEditing
             textView.isSelectable = isEditing
@@ -133,12 +143,8 @@ struct HighlightedCodeView: NSViewRepresentable {
         let wasCodeFocused = coord.wasCodeFocused
         coord.wasCodeFocused = focusCode
 
-        // Update cursor-first-line callback reference
-        coord.onCursorFirstLine = onCursorFirstLine
-
-        // Focus / unfocus the NSTextView
+        // Focus / unfocus the NSTextView.
         if focusCode && isEditing && textView.window?.firstResponder !== textView {
-            // Defer to next run loop so the view is fully laid out before requesting focus
             DispatchQueue.main.async {
                 textView.window?.makeFirstResponder(textView)
                 textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -153,8 +159,6 @@ struct HighlightedCodeView: NSViewRepresentable {
         let justStoppedEditing = coord.wasEditing && !isEditing
         coord.wasEditing = isEditing
 
-        // Release AppKit first responder when exiting edit mode entirely so
-        // SwiftUI's @FocusState can work correctly on the next edit entry.
         if justStoppedEditing && textView.window?.firstResponder === textView {
             textView.window?.makeFirstResponder(nil)
         }
@@ -162,12 +166,10 @@ struct HighlightedCodeView: NSViewRepresentable {
         if isEditing {
             if textView.string != code {
                 textView.string = code
-                // Restore white — setting .string strips all attributes
                 textView.textColor = .labelColor
             }
         } else if justStoppedEditing || textView.string != code || coord.renderedTheme != theme {
             if let highlighted = Self.highlightr?.highlight(code, as: language) {
-                // Keep syntax colors but force our font so edit/browse look identical
                 let result = NSMutableAttributedString(attributedString: highlighted)
                 let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
                 result.addAttribute(.font, value: font,
@@ -180,19 +182,6 @@ struct HighlightedCodeView: NSViewRepresentable {
                 coord.renderedTheme = theme
             }
         }
-
-        // Report natural height when wrapping so the parent can expand the frame
-        if wrapCode && !isEditing {
-            let onH = coord.onHeightChange
-            DispatchQueue.main.async {
-                guard let lm = textView.layoutManager,
-                      let tc = textView.textContainer else { return }
-                lm.ensureLayout(for: tc)
-                let used = lm.usedRect(for: tc)
-                let h = used.height + textView.textContainerInset.height * 2
-                onH?(max(16, h))
-            }
-        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -203,14 +192,6 @@ struct HighlightedCodeView: NSViewRepresentable {
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
         var renderedTheme: String = ""
-        var onHeightChange: ((CGFloat) -> Void)?
-        var frameObserver: NSObjectProtocol?
-
-        deinit {
-            if let frameObserver {
-                NotificationCenter.default.removeObserver(frameObserver)
-            }
-        }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
@@ -224,9 +205,26 @@ struct HighlightedCodeView: NSViewRepresentable {
         }
 
         private func reportFirstLine(_ tv: NSTextView) {
+            // Visual first line, not logical: when wrap is on, a long line
+            // wraps to multiple display lines and we need to know which one
+            // the cursor sits on.
+            guard let lm = tv.layoutManager, let tc = tv.textContainer else {
+                onCursorFirstLine?(true)
+                return
+            }
+            lm.ensureLayout(for: tc)
+            let totalGlyphs = lm.numberOfGlyphs
+            guard totalGlyphs > 0 else {
+                onCursorFirstLine?(true)
+                return
+            }
             let cursorPos = tv.selectedRange().location
-            let isFirst = !tv.string.prefix(cursorPos).contains("\n")
-            onCursorFirstLine?(isFirst)
+            var glyphIdx = lm.glyphIndexForCharacter(at: cursorPos)
+            if glyphIdx >= totalGlyphs { glyphIdx = totalGlyphs - 1 }
+            var lineGlyphRange = NSRange()
+            _ = lm.lineFragmentRect(forGlyphAt: glyphIdx,
+                                    effectiveRange: &lineGlyphRange)
+            onCursorFirstLine?(lineGlyphRange.location == 0)
         }
     }
 }
