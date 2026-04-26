@@ -77,7 +77,8 @@ struct SnippetListView: View {
                                         store.editSnapshot = current[i]
                                         store.editStep = 1
                                         NotificationCenter.default.post(name: .editModeChanged, object: true)
-                                    }
+                                    },
+                                    onCodeBlockClick: { focusAndCopy(at: i) }
                                 )
                                 .id(i)
                                 .overlay(alignment: .top) {
@@ -87,15 +88,7 @@ struct SnippetListView: View {
                                         .offset(y: -6)
                                         .opacity(dropTargetIndex == i ? 1 : 0)
                                 }
-                                .onTapGesture {
-                                    store.focusedIndex = i
-                                    guard store.editStep == 0 else { return }
-                                    let snippets = store.tabs[store.activeTab]
-                                    guard i < snippets.count else { return }
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(snippets[i].code, forType: .string)
-                                    postToast("Copied")
-                                }
+                                .onTapGesture { focusAndCopy(at: i) }
                                 .dropDestination(for: String.self) { items, _ in
                                     dropTargetIndex = nil
                                     guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
@@ -163,6 +156,16 @@ struct SnippetListView: View {
                 store.focusedIndex = 0
             }
         }
+    }
+
+    private func focusAndCopy(at i: Int) {
+        store.focusedIndex = i
+        guard store.editStep == 0 else { return }
+        let snippets = store.tabs[store.activeTab]
+        guard i < snippets.count else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(snippets[i].code, forType: .string)
+        postToast("Copied")
     }
 
     private func binding(for index: Int) -> Binding<Snippet> {
