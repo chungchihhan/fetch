@@ -108,7 +108,7 @@ private struct ResizeWidthDragView: NSViewRepresentable {
         let v = WidthDragNSView()
         v.onWidth = { newWidth in
             let screenWidth = Double(NSScreen.main?.visibleFrame.width ?? 1200) - 40
-            width = max(280, min(screenWidth, newWidth))
+            width = max(400, min(screenWidth, newWidth))
             NotificationCenter.default.post(name: .widthChanged, object: CGFloat(width))
         }
         return v
