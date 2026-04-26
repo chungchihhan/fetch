@@ -33,15 +33,14 @@ struct TabBarView: View {
 
             // Top-right indicator: toast takes precedence, otherwise "Edit Mode" while editing.
             if let msg = toastMessage {
-                Text(msg)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Color.styleAccent(colorScheme, style: iconStyle))
-                    .transition(.opacity)
-                    .padding(.trailing, 12)
+                ShineText(
+                    text: msg,
+                    baseColor: Color.styleAccent(colorScheme, style: iconStyle)
+                )
+                .transition(.opacity)
+                .padding(.trailing, 12)
             } else if store.editStep > 0 {
-                Text("Edit Mode")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(editAccent)
+                ShineText(text: "Edit Mode", baseColor: editAccent)
                     .padding(.trailing, 12)
             }
         }
@@ -59,6 +58,43 @@ struct TabBarView: View {
                 await MainActor.run { toastMessage = nil }
             }
         }
+    }
+}
+
+// Monospaced label that gets a soft moving "shine" sweep across the
+// glyphs every few seconds. Used for toast/edit-mode hints.
+private struct ShineText: View {
+    let text: String
+    let baseColor: Color
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let elapsed = timeline.date.timeIntervalSinceReferenceDate
+            let cycle = 2.6
+            let phase = elapsed.truncatingRemainder(dividingBy: cycle) / cycle
+            let highlight = phase * 1.6 - 0.3   // sweeps -0.3 → 1.3
+
+            Text(text)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(Self.gradient(at: highlight, base: baseColor))
+        }
+    }
+
+    private static func gradient(at h: Double, base: Color) -> LinearGradient {
+        let center = max(0, min(1, h))
+        let lo = max(0, min(1, h - 0.20))
+        let hi = max(0, min(1, h + 0.20))
+        return LinearGradient(
+            stops: [
+                .init(color: base,                  location: 0),
+                .init(color: base,                  location: lo),
+                .init(color: .white.opacity(0.85), location: center),
+                .init(color: base,                  location: hi),
+                .init(color: base,                  location: 1),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
     }
 }
 
