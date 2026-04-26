@@ -10,6 +10,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     var fontSize: CGFloat = 11
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
+    var onClick: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -26,6 +27,9 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = PointerCursorTextView()
+        textView.onMouseDownInBrowse = { [weak coord = context.coordinator] in
+            coord?.onClick?()
+        }
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.isRichText = false
         textView.isSelectable = false
@@ -133,6 +137,7 @@ struct HighlightedCodeView: NSViewRepresentable {
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
         coord.onCursorFirstLine = onCursorFirstLine
+        coord.onClick = onClick
 
         if textView.isEditable != isEditing {
             textView.isEditable = isEditing
@@ -217,6 +222,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onCodeChange: ((String) -> Void)?
         var onCursorFirstLine: ((Bool) -> Void)?
+        var onClick: (() -> Void)?
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
         var renderedTheme: String = ""
@@ -258,6 +264,8 @@ struct HighlightedCodeView: NSViewRepresentable {
 }
 
 private final class PointerCursorTextView: NSTextView {
+    var onMouseDownInBrowse: (() -> Void)?
+
     override func resetCursorRects() {
         if isEditable {
             super.resetCursorRects()
@@ -271,6 +279,18 @@ private final class PointerCursorTextView: NSTextView {
             super.cursorUpdate(with: event)
         } else {
             NSCursor.pointingHand.set()
+        }
+    }
+
+    // In browse mode, the SwiftUI parent owns click handling (focus + copy).
+    // The text view would otherwise swallow the click silently because
+    // selection / editing are off. Forward to the callback and don't fall
+    // through to NSTextView's default mouse handling.
+    override func mouseDown(with event: NSEvent) {
+        if isEditable {
+            super.mouseDown(with: event)
+        } else {
+            onMouseDownInBrowse?()
         }
     }
 }

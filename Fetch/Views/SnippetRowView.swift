@@ -68,6 +68,7 @@ struct SnippetRowView: View {
     var onCodeChange: (String) -> Void
     var onCursorFirstLine: ((Bool) -> Void)? = nil
     var onEnterEdit: () -> Void = {}
+    var onCodeBlockClick: () -> Void = {}
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
@@ -147,7 +148,8 @@ struct SnippetRowView: View {
                 wrapCode: codeWrap,
                 fontSize: fontSize,
                 onCodeChange: isEditing ? onCodeChange : nil,
-                onCursorFirstLine: onCursorFirstLine
+                onCursorFirstLine: onCursorFirstLine,
+                onClick: onCodeBlockClick
             )
             .frame(height: codeWrap ? nil : codeViewHeight)
             .padding(7)
