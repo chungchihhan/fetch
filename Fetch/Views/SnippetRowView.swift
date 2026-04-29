@@ -152,7 +152,8 @@ struct SnippetRowView: View {
                 onClick: onCodeBlockClick
             )
             .frame(height: codeWrap ? nil : codeViewHeight)
-            .padding(7)
+            .mask(CodeFadeMask(enabled: !codeWrap))
+            .padding(EdgeInsets(top: 7, leading: 7, bottom: 7, trailing: 14))
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))
         }
@@ -232,6 +233,23 @@ private struct EditIconButton: View {
                     }
                     .onEnded { _ in didFire = false }
             )
+    }
+}
+
+private struct CodeFadeMask: View {
+    var enabled: Bool
+    var fadeDistance: CGFloat = 28
+
+    var body: some View {
+        Rectangle().fill(.white)
+            .overlay(alignment: .trailing) {
+                LinearGradient(colors: [.clear, .white],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: fadeDistance)
+                    .opacity(enabled ? 1 : 0)
+                    .blendMode(.destinationOut)
+            }
+            .compositingGroup()
     }
 }
 
