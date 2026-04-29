@@ -26,6 +26,7 @@ private struct EndCursorTextField: NSViewRepresentable {
     var fontSize: CGFloat = 11
     var cursorTargetIndex: Int? = nil
     var onCursorTargetConsumed: () -> Void = {}
+    var onBeginEditing: () -> Void = {}
 
     func makeNSView(context: Context) -> EndCursorNSTextField {
         let field = EndCursorNSTextField()
@@ -69,6 +70,15 @@ private struct EndCursorTextField: NSViewRepresentable {
             guard let field = obj.object as? NSTextField else { return }
             parent.text = field.stringValue
         }
+
+        // Fires when the field gains an editing session — covers user clicks,
+        // tab navigation, and programmatic focus. The parent uses this to
+        // promote editStep from code-edit (2) back to title-edit (1) when the
+        // user clicks the title while the code is focused. Programmatic focus
+        // already runs with editStep == 1, so the parent's check is idempotent.
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            parent.onBeginEditing()
+        }
     }
 }
 
@@ -83,6 +93,7 @@ struct SnippetRowView: View {
     var onEnterEditAtTitle: (Int) -> Void = { _ in }
     var onEnterEditAtCode: (Int) -> Void = { _ in }
     var onCopy: () -> Void = {}
+    var onTitleBeganEditing: () -> Void = {}
     var cursorTargetIndex: Int? = nil
     var onCursorTargetConsumed: () -> Void = {}
 
@@ -142,7 +153,8 @@ struct SnippetRowView: View {
                         isFocused: editStep == 1,
                         fontSize: titleFontSize,
                         cursorTargetIndex: editStep == 1 ? cursorTargetIndex : nil,
-                        onCursorTargetConsumed: onCursorTargetConsumed
+                        onCursorTargetConsumed: onCursorTargetConsumed,
+                        onBeginEditing: onTitleBeganEditing
                     )
                 } else {
                     Text(snippet.title.isEmpty ? "Untitled" : snippet.title)

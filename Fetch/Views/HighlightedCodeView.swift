@@ -195,6 +195,15 @@ struct HighlightedCodeView: NSViewRepresentable {
                 coord.renderedTheme = theme
             }
         }
+
+        // Force glyph layout to complete now. Without this, fresh rows from a
+        // tab switch can render before the text view has sized itself for the
+        // new (potentially long) content, making the right-edge fade region
+        // and visible padding look tight until the next layout pass nudges
+        // them — typically triggered by a click on the row.
+        if let lm = textView.layoutManager, let tc = textView.textContainer {
+            lm.ensureLayout(for: tc)
+        }
     }
 
     // atom-one-dark uses #5C6370 for comments and atom-one-light uses #A0A1A7;
@@ -242,6 +251,11 @@ struct HighlightedCodeView: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
+            // Guard against programmatic selection changes that happen as a
+            // side-effect of becoming editable (e.g. entering title-edit
+            // mode on this row): only report when the user is actually
+            // focused in the code view.
+            guard tv.window?.firstResponder === tv else { return }
             reportFirstLine(tv)
         }
 
