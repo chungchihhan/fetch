@@ -10,7 +10,9 @@ struct HighlightedCodeView: NSViewRepresentable {
     var fontSize: CGFloat = 11
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
-    var onClick: (() -> Void)?
+    var onClick: ((Int) -> Void)?
+    var cursorTargetIndex: Int? = nil
+    var onCursorTargetConsumed: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -27,8 +29,8 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = PointerCursorTextView()
-        textView.onMouseDownInBrowse = { [weak coord = context.coordinator] in
-            coord?.onClick?()
+        textView.onMouseDownInBrowse = { [weak coord = context.coordinator] charIndex in
+            coord?.onClick?(charIndex)
         }
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.isRichText = false
@@ -150,10 +152,15 @@ struct HighlightedCodeView: NSViewRepresentable {
 
         // Focus / unfocus the NSTextView.
         if focusCode && isEditing && textView.window?.firstResponder !== textView {
+            let target = cursorTargetIndex
+            let onConsumed = onCursorTargetConsumed
             DispatchQueue.main.async {
                 textView.window?.makeFirstResponder(textView)
-                textView.setSelectedRange(NSRange(location: 0, length: 0))
+                let clamped = target.map { max(0, min($0, textView.string.utf16.count)) } ?? 0
+                textView.setSelectedRange(NSRange(location: clamped, length: 0))
+                textView.scrollRangeToVisible(NSRange(location: clamped, length: 0))
                 coord.onCursorFirstLine?(true)
+                if target != nil { onConsumed?() }
             }
         } else if !focusCode && wasCodeFocused && isEditing {
             if textView.window?.firstResponder === textView {
@@ -222,7 +229,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onCodeChange: ((String) -> Void)?
         var onCursorFirstLine: ((Bool) -> Void)?
-        var onClick: (() -> Void)?
+        var onClick: ((Int) -> Void)?
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
         var renderedTheme: String = ""
@@ -264,13 +271,13 @@ struct HighlightedCodeView: NSViewRepresentable {
 }
 
 private final class PointerCursorTextView: NSTextView {
-    var onMouseDownInBrowse: (() -> Void)?
+    var onMouseDownInBrowse: ((Int) -> Void)?
 
     override func resetCursorRects() {
         if isEditable {
             super.resetCursorRects()
         } else {
-            addCursorRect(bounds, cursor: .pointingHand)
+            addCursorRect(bounds, cursor: .iBeam)
         }
     }
 
@@ -278,19 +285,21 @@ private final class PointerCursorTextView: NSTextView {
         if isEditable {
             super.cursorUpdate(with: event)
         } else {
-            NSCursor.pointingHand.set()
+            NSCursor.iBeam.set()
         }
     }
 
-    // In browse mode, the SwiftUI parent owns click handling (focus + copy).
-    // The text view would otherwise swallow the click silently because
-    // selection / editing are off. Forward to the callback and don't fall
-    // through to NSTextView's default mouse handling.
+    // In browse mode, the SwiftUI parent owns click handling. Convert the
+    // click to a character index so the parent can position the insertion
+    // point at the exact spot when entering edit mode. We don't fall through
+    // to NSTextView's default mouseDown because selection/editing are off.
     override func mouseDown(with event: NSEvent) {
         if isEditable {
             super.mouseDown(with: event)
         } else {
-            onMouseDownInBrowse?()
+            let pointInView = convert(event.locationInWindow, from: nil)
+            let charIndex = characterIndexForInsertion(at: pointInView)
+            onMouseDownInBrowse?(charIndex)
         }
     }
 }

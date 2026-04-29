@@ -70,15 +70,16 @@ struct SnippetListView: View {
                                         // code-edit so ↑↓ navigate within it.
                                         if store.editStep == 1 { store.editStep = 2 }
                                     },
-                                    onEnterEdit: {
-                                        store.focusedIndex = i
-                                        let current = store.tabs[store.activeTab]
-                                        guard i < current.count else { return }
-                                        store.editSnapshot = current[i]
-                                        store.editStep = 1
-                                        NotificationCenter.default.post(name: .editModeChanged, object: true)
+                                    onEnterEdit: { focusAndEnterEdit(at: i, step: 1, cursor: nil) },
+                                    onEnterEditAtTitle: { idx in
+                                        focusAndEnterEdit(at: i, step: 1, cursor: idx)
                                     },
-                                    onCodeBlockClick: { focusAndCopy(at: i) }
+                                    onEnterEditAtCode: { idx in
+                                        focusAndEnterEdit(at: i, step: 2, cursor: idx)
+                                    },
+                                    onCopy: { focusAndCopy(at: i) },
+                                    cursorTargetIndex: store.focusedIndex == i ? store.pendingCursorIndex : nil,
+                                    onCursorTargetConsumed: { store.pendingCursorIndex = nil }
                                 )
                                 .id(i)
                                 .overlay(alignment: .top) {
@@ -88,7 +89,7 @@ struct SnippetListView: View {
                                         .offset(y: -6)
                                         .opacity(dropTargetIndex == i ? 1 : 0)
                                 }
-                                .onTapGesture { focusAndCopy(at: i) }
+                                .onTapGesture { focusAndEnterEdit(at: i, step: 1, cursor: nil) }
                                 .dropDestination(for: String.self) { items, _ in
                                     dropTargetIndex = nil
                                     guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
@@ -160,12 +161,22 @@ struct SnippetListView: View {
 
     private func focusAndCopy(at i: Int) {
         store.focusedIndex = i
-        guard store.editStep == 0 else { return }
         let snippets = store.tabs[store.activeTab]
         guard i < snippets.count else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippets[i].code, forType: .string)
         postToast("Copied")
+    }
+
+    private func focusAndEnterEdit(at i: Int, step: Int, cursor: Int?) {
+        store.focusedIndex = i
+        guard store.editStep == 0 else { return }
+        let current = store.tabs[store.activeTab]
+        guard i < current.count else { return }
+        store.editSnapshot = current[i]
+        store.pendingCursorIndex = cursor
+        store.editStep = step
+        NotificationCenter.default.post(name: .editModeChanged, object: true)
     }
 
     private func binding(for index: Int) -> Binding<Snippet> {
