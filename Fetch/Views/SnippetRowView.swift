@@ -3,12 +3,18 @@ import AppKit
 
 enum SnippetField: Hashable { case title, code }
 
-// NSTextField subclass that places cursor at end on focus
+// NSTextField subclass that places cursor at a target index on focus, or at
+// the end of the string if no target is set.
 private final class EndCursorNSTextField: NSTextField {
+    var pendingCursorIndex: Int? = nil
+
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
         if result, let editor = currentEditor() {
-            editor.selectedRange = NSRange(location: stringValue.utf16.count, length: 0)
+            let utf16Count = stringValue.utf16.count
+            let location = pendingCursorIndex.map { max(0, min($0, utf16Count)) } ?? utf16Count
+            editor.selectedRange = NSRange(location: location, length: 0)
+            pendingCursorIndex = nil
         }
         return result
     }
@@ -18,6 +24,8 @@ private struct EndCursorTextField: NSViewRepresentable {
     @Binding var text: String
     var isFocused: Bool
     var fontSize: CGFloat = 11
+    var cursorTargetIndex: Int? = nil
+    var onCursorTargetConsumed: () -> Void = {}
 
     func makeNSView(context: Context) -> EndCursorNSTextField {
         let field = EndCursorNSTextField()
@@ -41,8 +49,12 @@ private struct EndCursorTextField: NSViewRepresentable {
             nsView.stringValue = text
         }
         if isFocused, !isBeingEdited {
+            nsView.pendingCursorIndex = cursorTargetIndex
+            let hadTarget = cursorTargetIndex != nil
+            let consumed = onCursorTargetConsumed
             DispatchQueue.main.async {
                 nsView.window?.makeFirstResponder(nsView)
+                if hadTarget { consumed() }
             }
         }
     }
@@ -68,7 +80,11 @@ struct SnippetRowView: View {
     var onCodeChange: (String) -> Void
     var onCursorFirstLine: ((Bool) -> Void)? = nil
     var onEnterEdit: () -> Void = {}
-    var onCodeBlockClick: () -> Void = {}
+    var onEnterEditAtTitle: (Int) -> Void = { _ in }
+    var onEnterEditAtCode: (Int) -> Void = { _ in }
+    var onCopy: () -> Void = {}
+    var cursorTargetIndex: Int? = nil
+    var onCursorTargetConsumed: () -> Void = {}
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
@@ -124,16 +140,27 @@ struct SnippetRowView: View {
                     EndCursorTextField(
                         text: Binding(get: { snippet.title }, set: { onTitleChange($0) }),
                         isFocused: editStep == 1,
-                        fontSize: titleFontSize
+                        fontSize: titleFontSize,
+                        cursorTargetIndex: editStep == 1 ? cursorTargetIndex : nil,
+                        onCursorTargetConsumed: onCursorTargetConsumed
                     )
                 } else {
                     Text(snippet.title.isEmpty ? "Untitled" : snippet.title)
                         .font(.system(size: titleFontSize, design: .monospaced))
                         .foregroundStyle(.primary.opacity(isFocused ? 0.90 : 0.60))
+                        .contentShape(Rectangle())
+                        .onTapGesture(coordinateSpace: .local) { location in
+                            let utf16Count = snippet.title.utf16.count
+                            if utf16Count == 0 {
+                                onEnterEditAtTitle(0)
+                            } else {
+                                let charWidth = Self.monospacedCharWidth(fontSize: titleFontSize)
+                                let approx = Int((location.x / charWidth).rounded())
+                                onEnterEditAtTitle(max(0, min(utf16Count, approx)))
+                            }
+                        }
                     Spacer(minLength: 0)
-                    if isFocused {
-                        EditIconButton(action: onEnterEdit)
-                    }
+                    CopyIconButton(action: onCopy, isRowFocused: isFocused)
                 }
             }
             .frame(minHeight: max(20, titleFontSize * 1.6))
@@ -149,7 +176,9 @@ struct SnippetRowView: View {
                 fontSize: fontSize,
                 onCodeChange: isEditing ? onCodeChange : nil,
                 onCursorFirstLine: onCursorFirstLine,
-                onClick: onCodeBlockClick
+                onClick: { idx in onEnterEditAtCode(idx) },
+                cursorTargetIndex: editStep == 2 ? cursorTargetIndex : nil,
+                onCursorTargetConsumed: onCursorTargetConsumed
             )
             .frame(height: codeWrap ? nil : codeViewHeight)
             .mask(CodeFadeMask(enabled: !codeWrap))
@@ -157,6 +186,11 @@ struct SnippetRowView: View {
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 5))
         }
+    }
+
+    private static func monospacedCharWidth(fontSize: CGFloat) -> CGFloat {
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        return NSAttributedString(string: "M", attributes: [.font: font]).size().width
     }
 
     // 1–5 visible lines, then vertical scroll
@@ -193,20 +227,21 @@ struct SnippetRowView: View {
     }
 }
 
-private struct EditIconButton: View {
+private struct CopyIconButton: View {
     var action: () -> Void
+    var isRowFocused: Bool = false
     @State private var isHovering = false
     @State private var didFire = false
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
 
     var body: some View {
-        Image(systemName: "square.and.pencil")
+        Image(systemName: "doc.on.doc")
             .font(.system(size: 12, weight: .regular))
             .foregroundStyle(
                 isHovering
                     ? Color.styleAccent(colorScheme, style: iconStyle)
-                    : .primary.opacity(0.50)
+                    : .primary.opacity(isRowFocused ? 0.50 : 0.30)
             )
             .shadow(
                 color: isHovering
@@ -218,7 +253,7 @@ private struct EditIconButton: View {
             .animation(.easeInOut(duration: 0.18), value: isHovering)
             .frame(width: 20, height: 20)
             .contentShape(Rectangle())
-            .help("Edit snippet (⌘E)")
+            .help("Copy snippet (⌘C)")
             .onHover { hovering in
                 isHovering = hovering
                 if hovering { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
