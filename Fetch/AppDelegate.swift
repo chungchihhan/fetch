@@ -360,8 +360,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 openMainWindow()
                 return
             }
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            // Allow the popover's host window to appear over apps in their own
+            // full-screen Space and float above full-screen chrome.
+            if let win = popover.contentViewController?.view.window {
+                win.collectionBehavior.insert(.canJoinAllSpaces)
+                win.collectionBehavior.insert(.fullScreenAuxiliary)
+                win.level = .statusBar
+                win.makeKey()
+            }
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
             }
