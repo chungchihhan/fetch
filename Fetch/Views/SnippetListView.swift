@@ -78,6 +78,21 @@ struct SnippetListView: View {
                                         focusAndEnterEdit(at: i, step: 2, cursor: idx)
                                     },
                                     onCopy: { focusAndCopy(at: i) },
+                                    onTitleBeganEditing: {
+                                        // Title NSTextField started editing while
+                                        // we're in code-edit — the user clicked the
+                                        // title to switch focus. Mirror the
+                                        // code-side promotion that lives in
+                                        // onCursorFirstLine: drop pendingCursorIndex
+                                        // (AppKit's click already placed the cursor)
+                                        // and demote editStep so HighlightedCodeView
+                                        // releases first responder instead of
+                                        // stealing it back on the next render.
+                                        if store.editStep == 2 {
+                                            store.pendingCursorIndex = nil
+                                            store.editStep = 1
+                                        }
+                                    },
                                     cursorTargetIndex: store.focusedIndex == i ? store.pendingCursorIndex : nil,
                                     onCursorTargetConsumed: { store.pendingCursorIndex = nil }
                                 )
