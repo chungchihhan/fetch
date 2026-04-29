@@ -10,8 +10,19 @@ final class HotKeyManager {
 
     init(keyCode: UInt32, carbonMods: UInt32, nsMods: NSEvent.ModifierFlags,
          action: @escaping () -> Void) {
-        self.action = action
-        setupCarbonHandler(action: action)
+        // Debounce: a single physical hotkey press can be observed by both
+        // the Carbon hotkey handler and an NSEvent monitor (especially the
+        // local one when our popover is foreground), which would call action
+        // twice and toggle the popover off-then-on.
+        var lastFire: TimeInterval = 0
+        let debounced: () -> Void = {
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastFire < 0.2 { return }
+            lastFire = now
+            action()
+        }
+        self.action = debounced
+        setupCarbonHandler(action: debounced)
         registerCarbonKey(keyCode: keyCode, carbonMods: carbonMods)
         registerNSMonitors(keyCode: keyCode, nsMods: nsMods)
     }

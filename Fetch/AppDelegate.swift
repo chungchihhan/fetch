@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyManager: HotKeyManager?
     var eventMonitor: Any?
     private var updateCheckTimer: Timer?
+    // Held while the popover is anchored to a transient invisible view on a
+    // non-home display (multi-display fullscreen scenarios).
+    private var popoverAnchorWindow: NSWindow?
+    private var togglePopoverRetries = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
@@ -354,30 +358,127 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
-        } else {
-            // With no menu-bar icon, fall back to the main window instead.
-            guard let button = statusItem?.button else {
-                openMainWindow()
-                return
-            }
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            // Allow the popover's host window to appear over apps in their own
-            // full-screen Space and float above full-screen chrome.
-            if let win = popover.contentViewController?.view.window {
-                win.collectionBehavior.insert(.canJoinAllSpaces)
-                win.collectionBehavior.insert(.fullScreenAuxiliary)
-                win.level = .statusBar
-                win.makeKey()
-            }
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
-            }
+            togglePopoverRetries = 0
+            return
         }
+        // With no menu-bar icon, fall back to the main window instead.
+        guard let button = statusItem?.button else {
+            openMainWindow()
+            return
+        }
+        // First call after launch can hit before NSStatusBar has positioned
+        // the button into a menu bar — its window lands at unified (0, 0)
+        // until something nudges layout. Retry briefly until the button
+        // reports a menu-bar Y, then proceed.
+        if let frame = button.window?.frame,
+           !NSScreen.screens.contains(where: { abs($0.frame.maxY - frame.maxY) < 5 }),
+           togglePopoverRetries < 10 {
+            togglePopoverRetries += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                self?.togglePopover()
+            }
+            return
+        }
+        togglePopoverRetries = 0
+
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let anchor = transientAnchorIfNeeded(for: button) {
+            popoverAnchorWindow = anchor
+            let view = anchor.contentView!
+            popover.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+        // Allow the popover's host window to appear over apps in their own
+        // full-screen Space and float above full-screen chrome.
+        if let win = popover.contentViewController?.view.window {
+            win.collectionBehavior.insert(.canJoinAllSpaces)
+            win.collectionBehavior.insert(.fullScreenAuxiliary)
+            win.level = .statusBar
+            win.makeKey()
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
+        }
+    }
+
+    // NSStatusItem has only one button, hosted on the home menu bar. With
+    // multi-display + Displays-have-separate-Spaces, the icon the user sees on
+    // a non-home screen is a system-rendered mirror whose X position cannot
+    // be computed from the home button's geometry (notch, per-display widget
+    // composition, etc. are all in play). So when the user triggers from a
+    // non-home screen — or when the home menu bar is hidden by a foreground
+    // app — we hand NSPopover a transient invisible anchor view positioned
+    // near the top-right of the active screen and let it position itself.
+    private func transientAnchorIfNeeded(for button: NSStatusBarButton) -> NSWindow? {
+        guard let buttonWindow = button.window else { return nil }
+        let cursor = NSEvent.mouseLocation
+        let activeScreen = NSScreen.screens.first { $0.frame.contains(cursor) }
+            ?? NSScreen.main
+            ?? buttonWindow.screen
+        guard let active = activeScreen else { return nil }
+
+        let buttonScreen = buttonWindow.screen
+        let menuBarHidden = (active.frame.maxY - active.visibleFrame.maxY) < 1
+        let onDifferentScreen = buttonScreen != nil && buttonScreen !== active
+        // NSStatusBarWindow can extend a hair above its screen's top edge,
+        // making buttonWindow.screen return nil even when the button is on a
+        // valid display. Treat nil-screen as "needs re-anchoring" because
+        // NSPopover's own positioning misbehaves in that state.
+        let buttonScreenMissing = buttonScreen == nil
+        guard menuBarHidden || onDifferentScreen || buttonScreenMissing else { return nil }
+
+        // Find the display the button visually lives on, even when its
+        // window's .screen property is nil.
+        let buttonScreenRect = buttonWindow.convertToScreen(button.frame)
+        let buttonHomeScreen = buttonScreen ?? NSScreen.screens.first(where: { screen in
+            let f = screen.frame
+            return buttonScreenRect.midX >= f.minX
+                && buttonScreenRect.midX < f.maxX
+                && buttonScreenRect.minY <= f.maxY + 1
+                && buttonScreenRect.maxY >= f.minY
+        }) ?? active
+
+        let menuBarHeight: CGFloat = 24
+        let anchorX: CGFloat
+        let anchorY: CGFloat
+        if buttonHomeScreen !== active {
+            // Different display from where the user is — translate the icon's
+            // offset-from-right to the active screen.
+            let offset = buttonHomeScreen.frame.maxX - buttonScreenRect.midX
+            anchorX = active.frame.maxX - offset
+            anchorY = active.frame.maxY - menuBarHeight - 1
+        } else {
+            // Same display — anchor at the button's actual screen-rect center.
+            anchorX = buttonScreenRect.midX
+            anchorY = max(active.frame.maxY - menuBarHeight - 1, buttonScreenRect.minY - 1)
+        }
+        let anchorRect = NSRect(x: anchorX, y: anchorY, width: 1, height: 1)
+        let window = NSWindow(
+            contentRect: anchorRect,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        window.level = .statusBar
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        window.contentView = view
+        window.orderFront(nil)
+        return window
     }
 
     @objc func popoverWillClose() {
         store.saveAll()
+        if let anchor = popoverAnchorWindow {
+            anchor.orderOut(nil)
+            popoverAnchorWindow = nil
+        }
     }
 
     @objc func handleHeightChanged(_ note: Notification) {
