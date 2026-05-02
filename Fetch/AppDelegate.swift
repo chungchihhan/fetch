@@ -217,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.popover.isShown else { return }
-            self.popover.performClose(nil)
+            self.closePopover()
         }
         NotificationCenter.default.addObserver(
             self,
@@ -298,8 +298,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func handleClosePopover() {
         if popover?.isShown == true {
-            popover.performClose(nil)
+            closePopover()
         }
+    }
+
+    // Drop the host window's alpha to 0 before tearing it down so the
+    // WindowServer doesn't composite a residual popover frame over a
+    // GPU-rendered foreground app (Zed, etc.) while the close completes —
+    // visible as a small flash on toggle-off in fullscreen Spaces.
+    private func closePopover() {
+        popover.contentViewController?.view.window?.alphaValue = 0
+        popover.performClose(nil)
     }
 
     @objc func handleDisplayModeChanged() {
@@ -357,7 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func togglePopover() {
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
             togglePopoverRetries = 0
             return
         }
@@ -391,11 +400,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
         // Allow the popover's host window to appear over apps in their own
-        // full-screen Space and float above full-screen chrome.
+        // full-screen Space and float above full-screen chrome. Use
+        // .popUpMenu (101) — GPU-rendered apps like Zed/Warp/Ghostty can
+        // composite above .statusBar (25) in their fullscreen Space, hiding
+        // the popover. alphaValue is reset because closePopover() drops it
+        // to 0 to suppress a tear-down frame, and the host window is
+        // sometimes reused across show cycles.
         if let win = popover.contentViewController?.view.window {
+            win.alphaValue = 1
             win.collectionBehavior.insert(.canJoinAllSpaces)
             win.collectionBehavior.insert(.fullScreenAuxiliary)
-            win.level = .statusBar
+            win.level = .popUpMenu
             win.makeKey()
         }
         DispatchQueue.main.async {
