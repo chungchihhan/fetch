@@ -197,10 +197,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Fetch")
                 button.image?.isTemplate = true
             }
-            button.action = #selector(togglePopover)
+            button.action = #selector(handleStatusItemClick)
             button.target = self
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
         }
     }
+
+    @objc func handleStatusItemClick() {
+        guard let event = NSApp.currentEvent else { return }
+        if event.type == .rightMouseDown {
+            showStatusItemMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
+    private func showStatusItemMenu() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "About Fetch", action: #selector(showAbout), keyEquivalent: "")
+            .target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+            .target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit Fetch", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        statusItem?.menu = menu
+        statusItem?.button?.performClick(nil)
+        statusItem?.menu = nil
+    }
+
+    @objc private func showAbout() {
+        openSettings()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .openSettingsTab, object: 2)
+        }
+    }
+
 
     private func setupPopover() {
         popover = NSPopover()
@@ -547,6 +579,7 @@ extension Notification.Name {
     static let iconStyleChanged   = Notification.Name("FetchIconStyleChanged")
     static let displayModeChanged = Notification.Name("FetchDisplayModeChanged")
     static let closePopover       = Notification.Name("FetchClosePopover")
+    static let openSettingsTab    = Notification.Name("FetchOpenSettingsTab")
 }
 
 // NSButton variant with a soft yellow capsule that brightens on hover.
