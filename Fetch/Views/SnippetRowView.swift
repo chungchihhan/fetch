@@ -128,7 +128,6 @@ struct SnippetRowView: View {
                     switch phase {
                     case .active:
                         isHovering = true
-                        if !isEditing { NSCursor.pointingHand.set() }
                     case .ended:
                         isHovering = false
                         NSCursor.arrow.set()
@@ -161,6 +160,9 @@ struct SnippetRowView: View {
                         .font(.system(size: titleFontSize, design: .monospaced))
                         .foregroundStyle(.primary.opacity(isFocused ? 0.90 : 0.60))
                         .contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            if case .active = phase { NSCursor.iBeam.set() } else { NSCursor.arrow.set() }
+                        }
                         .onTapGesture(coordinateSpace: .local) { location in
                             let utf16Count = snippet.title.utf16.count
                             if utf16Count == 0 {
