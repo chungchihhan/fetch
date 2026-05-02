@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage("fetchDisplayMode") private var displayMode: String = "both"
     @AppStorage("fetchConfirmDelete") private var confirmDelete: Bool = true
     @State private var updater = Updater.shared
+    @State private var selectedTab = 0
 
     private var displayPath: String {
         dataDirectory.isEmpty ? SnippetStore.defaultDirectory.path : dataDirectory
@@ -34,13 +35,16 @@ struct SettingsView: View {
                 .opacity(0.55)
                 .ignoresSafeArea()
 
-            TabView {
+            TabView(selection: $selectedTab) {
                 generalTab
                     .tabItem { Label("General", systemImage: "gearshape") }
+                    .tag(0)
                 shortcutsTab
                     .tabItem { Label("Shortcuts", systemImage: "keyboard") }
+                    .tag(1)
                 aboutTab
                     .tabItem { Label("About", systemImage: "info.circle") }
+                    .tag(2)
             }
             .frame(width: 400)
         }
@@ -52,6 +56,9 @@ struct SettingsView: View {
         }
         .onChange(of: displayMode) { _, _ in
             NotificationCenter.default.post(name: .displayModeChanged, object: nil)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { note in
+            if let tab = note.object as? Int { selectedTab = tab }
         }
     }
 
