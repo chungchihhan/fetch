@@ -92,7 +92,7 @@ struct HighlightedCodeView: NSViewRepresentable {
             proposedWidth - 2 * Self.containerInsetX - 2 * Self.lineFragmentPadding
         )
         let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        let attr = NSAttributedString(string: code, attributes: [.font: font])
+        let attr = NSAttributedString(string: code.isEmpty ? " " : code, attributes: [.font: font])
         let rect = attr.boundingRect(
             with: NSSize(width: usable, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading]
