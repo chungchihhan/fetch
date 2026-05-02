@@ -46,7 +46,7 @@ struct SettingsView: View {
                     .tabItem { Label("About", systemImage: "info.circle") }
                     .tag(2)
             }
-            .frame(width: 400)
+            .frame(width: 480, height: 520)
         }
         .onChange(of: colorSchemeKey) { _, newValue in
             (NSApp.delegate as? AppDelegate)?.applyAppearance(newValue)
@@ -63,47 +63,95 @@ struct SettingsView: View {
     }
 
     private var shortcutsTab: some View {
-        VStack(spacing: 0) {
-            sectionHeader("Global", firstInList: true)
-            shortcutRow(shortcutDisplay, "Toggle Fetch")
-
-            sectionHeader("Browse")
-            shortcutRow("⌘1 – ⌘6", "Switch tabs")
-            shortcutRow("↑ / ↓", "Navigate snippets")
-            shortcutRow("↵", "Copy code only")
-            shortcutRow("⌘C", "Copy title with code")
-            shortcutRow("⌘E", "Enter edit mode")
-            shortcutRow("⌘N", "New snippet")
-            shortcutRow("⌘D", "Delete focused snippet")
-            shortcutRow("⌥↑ / ⌥↓", "Reorder snippet up / down")
-            shortcutRow("⌘Z / ⌘⇧Z", "Undo / Redo")
-            shortcutRow("⌘= / ⌘-", "Increase / decrease text size")
-            shortcutRow("⌘,", "Open Settings")
-            shortcutRow("Esc", "Close popover")
-
-            sectionHeader("Edit")
-            shortcutRow("Tab / ⇧Tab", "Switch title / code")
-            shortcutRow("↵", "Save and exit")
-            shortcutRow("Esc", "Save and exit")
-            shortcutRow("⇧↵", "New line in code")
-            shortcutRow("⌘E", "Exit edit")
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                shortcutSection("Global", firstInList: true, rows: [
+                    (shortcutDisplay, "Toggle Fetch"),
+                ])
+                shortcutSection("Browse", rows: [
+                    ("⌘1 – ⌘6", "Switch tabs"),
+                    ("↑ / ↓", "Navigate snippets"),
+                    ("↵", "Copy code only"),
+                    ("⌘C", "Copy title + code"),
+                    ("⌘E", "Enter edit mode"),
+                    ("⌘N", "New snippet"),
+                    ("⌘D", "Delete snippet"),
+                    ("⌥↑ / ⌥↓", "Reorder up / down"),
+                    ("⌘Z / ⌘⇧Z", "Undo / Redo"),
+                    ("⌘= / ⌘−", "Increase / decrease size"),
+                    ("⌘,", "Open Settings"),
+                    ("Esc", "Close popover"),
+                ])
+                shortcutSection("Edit", rows: [
+                    ("Tab / ⇧Tab", "Switch title / code"),
+                    ("↵", "Save and exit"),
+                    ("Esc", "Save and exit"),
+                    ("⇧↵", "New line in code"),
+                    ("⌘E", "Exit edit"),
+                ])
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+    }
+
+    @ViewBuilder
+    private func shortcutSection(_ title: String, firstInList: Bool = false, rows: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(title, firstInList: firstInList)
+            VStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                    shortcutRow(row.0, row.1)
+                    if idx < rows.count - 1 {
+                        Divider()
+                            .padding(.leading, 176)
+                            .opacity(0.6)
+                    }
+                }
+            }
+            .background(.primary.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(.primary.opacity(0.1), lineWidth: 0.5))
+        }
     }
 
     private func shortcutRow(_ keys: String, _ description: String) -> some View {
-        HStack(alignment: .center) {
-            Text(keys)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.primary.opacity(0.80))
-                .frame(width: 120, alignment: .leading)
+        HStack(alignment: .center, spacing: 12) {
+            HStack(spacing: 4) {
+                ForEach(Array(keys.components(separatedBy: " / ").enumerated()), id: \.offset) { i, part in
+                    if i > 0 {
+                        Text("/")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                    keyBadge(part)
+                }
+            }
+            .frame(width: 148, alignment: .trailing)
             Text(description)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
         }
-        .padding(.vertical, 5)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func keyBadge(_ key: String) -> some View {
+        Text(key)
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .shadow(color: .black.opacity(0.15), radius: 0, x: 0, y: 1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(.primary.opacity(0.18), lineWidth: 0.5)
+            )
     }
 
     private var aboutTab: some View {
@@ -114,12 +162,12 @@ struct SettingsView: View {
                     .frame(width: 96, height: 96)
             }
             Text("Fetch")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
             Text("v\(updater.currentVersion)")
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 13, design: .monospaced))
                 .foregroundStyle(.secondary)
             Text("Fast, keyboard-driven code snippet manager\nfor your Mac menu bar.")
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 13, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 2)
@@ -128,10 +176,10 @@ struct SettingsView: View {
 
             Link(destination: URL(string: "https://github.com/chungchihhan/fetch")!) {
                 Label("github.com/chungchihhan/fetch", systemImage: "arrow.up.right.square")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: 13, design: .monospaced))
             }
             Text("MIT © 2026 Chih-Han Chung")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
@@ -139,225 +187,216 @@ struct SettingsView: View {
     }
 
     private var generalTab: some View {
-        VStack(spacing: 0) {
-                sectionHeader("Appearance", firstInList: true)
-
-                settingRow {
-                    Text("Theme")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("", selection: $colorSchemeKey) {
-                        Text("System").tag("system")
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                settingSection("Appearance", firstInList: true) {
+                    settingRow {
+                        Text("Theme")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Picker("", selection: $colorSchemeKey) {
+                            Text("System").tag("system")
+                            Text("Light").tag("light")
+                            Text("Dark").tag("dark")
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 185)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 160)
-                }
-
-                Divider()
-
-                settingRow {
-                    Text("Display Mode")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("", selection: $displayMode) {
-                        Text("Both").tag("both")
-                        Text("Menu Bar Only").tag("menuBarOnly")
-                        Text("Window Only").tag("windowOnly")
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-
-                Divider()
-
-                settingRow {
-                    Text("Icon Style")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("", selection: $iconStyle) {
-                        Text("Foxfire").tag("foxfire")
-                        Text("Gloaming").tag("gloaming")
-                        Text("Smoulder").tag("smoulder")
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-
-                sectionHeader("Editor")
-
-                settingRow {
-                    Text("Code Wrap")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Toggle("", isOn: $codeWrap)
-                        .toggleStyle(.switch)
+                    Divider()
+                    settingRow {
+                        Text("Display Mode")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Picker("", selection: $displayMode) {
+                            Text("Both").tag("both")
+                            Text("Menu Bar Only").tag("menuBarOnly")
+                            Text("Window Only").tag("windowOnly")
+                        }
                         .labelsHidden()
-                }
-
-                Divider()
-
-                settingRow {
-                    Text("Tab Font Size")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Slider(value: $tabFontSize, in: 8...20, step: 1)
-                            .frame(width: 120)
-                        Text("\(Int(tabFontSize)) pt")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, alignment: .leading)
+                        .fixedSize()
                     }
-                }
-
-                Divider()
-
-                settingRow {
-                    Text("Title Font Size")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Slider(value: $titleFontSize, in: 8...20, step: 1)
-                            .frame(width: 120)
-                        Text("\(Int(titleFontSize)) pt")
-                            .font(.system(size: 10, design: .monospaced))
+                    Divider()
+                    settingRow {
+                        Text("Icon Style")
+                            .font(.system(size: 13, design: .monospaced))
                             .foregroundStyle(.secondary)
-                            .frame(width: 32, alignment: .leading)
-                    }
-                }
-
-                Divider()
-
-                settingRow {
-                    Text("Code Font Size")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Slider(value: $fontSize, in: 8...20, step: 1)
-                            .frame(width: 120)
-                        Text("\(Int(fontSize)) pt")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, alignment: .leading)
-                    }
-                }
-
-                sectionHeader("Behavior")
-
-                settingRow {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Confirm Before Delete")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                        Text("Ask to confirm when pressing ⌘D")
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
-                    Spacer()
-                    Toggle("", isOn: $confirmDelete)
-                        .toggleStyle(.switch)
+                        Spacer()
+                        Picker("", selection: $iconStyle) {
+                            Text("Foxfire").tag("foxfire")
+                            Text("Gloaming").tag("gloaming")
+                            Text("Smoulder").tag("smoulder")
+                        }
                         .labelsHidden()
-                }
-
-                sectionHeader("System")
-
-                settingRow {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Data Folder")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                        Text(displayPath)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: 200, alignment: .leading)
+                        .fixedSize()
                     }
-                    Spacer()
-                    Button("Browse…") { pickFolder() }
                 }
 
-                Divider()
-
-                settingRow {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Global Shortcut")
-                            .font(.system(size: 10, design: .monospaced))
+                settingSection("Editor") {
+                    settingRow {
+                        Text("Code Wrap")
+                            .font(.system(size: 13, design: .monospaced))
                             .foregroundStyle(.secondary)
-                        Text("Click box to record")
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                        Spacer()
+                        Toggle("", isOn: $codeWrap)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
                     }
-                    Spacer()
-                    ShortcutRecorderView(
-                        keyCode: $shortcutKeyCode,
-                        carbonMods: $shortcutCarbonMods,
-                        display: $shortcutDisplay
-                    )
-                    .frame(width: 100, height: 26)
+                    Divider()
+                    settingRow {
+                        Text("Tab Font Size")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 8) {
+                            Slider(value: $tabFontSize, in: 8...20, step: 1)
+                                .frame(width: 140)
+                            Text("\(Int(tabFontSize)) pt")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(width: 48, alignment: .leading)
+                        }
+                    }
+                    Divider()
+                    settingRow {
+                        Text("Title Font Size")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 8) {
+                            Slider(value: $titleFontSize, in: 8...20, step: 1)
+                                .frame(width: 140)
+                            Text("\(Int(titleFontSize)) pt")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(width: 48, alignment: .leading)
+                        }
+                    }
+                    Divider()
+                    settingRow {
+                        Text("Code Font Size")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 8) {
+                            Slider(value: $fontSize, in: 8...20, step: 1)
+                                .frame(width: 140)
+                            Text("\(Int(fontSize)) pt")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(width: 48, alignment: .leading)
+                        }
+                    }
                 }
 
-                sectionHeader("Updates")
+                settingSection("Behavior") {
+                    settingRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Confirm Before Delete")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text("Ask to confirm when pressing ⌘D")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $confirmDelete)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
+                }
 
-                settingRow {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Version \(updater.currentVersion)")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                        if !updater.statusMessage.isEmpty {
-                            Text(updater.statusMessage)
-                                .font(.system(size: 9, design: .monospaced))
+                settingSection("System") {
+                    settingRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Data Folder")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text(displayPath)
+                                .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
-                                .truncationMode(.tail)
-                                .frame(maxWidth: 200, alignment: .leading)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: 240, alignment: .leading)
                         }
+                        Spacer()
+                        Button("Browse…") { pickFolder() }
                     }
-                    Spacer()
-                    if updater.updateReady {
-                        Button("Relaunch") { updater.relaunch() }
-                    } else if updater.updateAvailable {
-                        Button(updater.isInstalling ? "Installing…" : "Update Now") {
-                            updater.installUpdate()
+                    Divider()
+                    settingRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Global Shortcut")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text("Click box to record")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.tertiary)
                         }
-                        .disabled(updater.isInstalling)
-                    } else {
-                        Button(updater.isChecking ? "Checking…" : "Check Now") {
-                            Task { await updater.checkForUpdates() }
-                        }
-                        .disabled(updater.isChecking)
+                        Spacer()
+                        ShortcutRecorderView(
+                            keyCode: $shortcutKeyCode,
+                            carbonMods: $shortcutCarbonMods,
+                            display: $shortcutDisplay
+                        )
+                        .frame(width: 120, height: 30)
                     }
                 }
 
-                Divider()
-
-                settingRow {
-                    Text("Auto-check for Updates")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Toggle("", isOn: $autoCheckUpdates)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
+                settingSection("Updates") {
+                    settingRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Version \(updater.currentVersion)")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            if !updater.statusMessage.isEmpty {
+                                Text(updater.statusMessage)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .frame(maxWidth: 240, alignment: .leading)
+                            }
+                        }
+                        Spacer()
+                        if updater.updateReady {
+                            Button("Relaunch") { updater.relaunch() }
+                        } else if updater.updateAvailable {
+                            Button(updater.isInstalling ? "Installing…" : "Update Now") {
+                                updater.installUpdate()
+                            }
+                            .disabled(updater.isInstalling)
+                        } else {
+                            Button(updater.isChecking ? "Checking…" : "Check Now") {
+                                Task { await updater.checkForUpdates() }
+                            }
+                            .disabled(updater.isChecking)
+                        }
+                    }
+                    Divider()
+                    settingRow {
+                        Text("Auto-check for Updates")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Toggle("", isOn: $autoCheckUpdates)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
                 }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
     }
 
     private func sectionHeader(_ title: String, firstInList: Bool = false) -> some View {
         HStack {
             Text(title.uppercased())
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .tracking(1)
             Spacer()
@@ -367,8 +406,22 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
+    private func settingSection<Content: View>(_ title: String, firstInList: Bool = false, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(title, firstInList: firstInList)
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(.primary.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(.primary.opacity(0.1), lineWidth: 0.5))
+        }
+    }
+
+    @ViewBuilder
     private func settingRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         HStack(alignment: .center) { content() }
+            .padding(.horizontal, 14)
             .padding(.vertical, 12)
     }
 
@@ -454,7 +507,7 @@ final class ShortcutRecorderNSView: NSView {
 
         let label = displayString.isEmpty ? "…" : displayString
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
             .foregroundColor: NSColor.labelColor
         ]
         let str = NSAttributedString(string: label, attributes: attrs)
