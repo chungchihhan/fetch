@@ -14,11 +14,12 @@ struct SnippetListView: View {
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var nav = ListNavState()
     @State private var dropTargetIndex: Int? = nil
+    @State private var copyFlashIndex: Int? = nil
 
     var snippets: [Snippet] { store.tabs[store.activeTab] }
 
     var body: some View {
-        let handler = makeKeyHandler(nav: nav, store: store)
+        let handler = makeKeyHandler(nav: nav, store: store, onCopyFlash: triggerCopyFlash)
 
         ZStack {
             // Zero-size background view that installs the key monitor
@@ -55,66 +56,7 @@ struct SnippetListView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 10) {
                             ForEach(Array(snippets.enumerated()), id: \.element.id) { i, snippet in
-                                SnippetRowView(
-                                    snippet: binding(for: i),
-                                    isFocused: store.focusedIndex == i,
-                                    editStep: store.focusedIndex == i ? store.editStep : 0,
-                                    onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
-                                    onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
-                                    onCursorFirstLine: { isFirst in
-                                        nav.cursorOnFirstLine = isFirst
-                                        // The code's selection only changes
-                                        // while editing; if it does and we're
-                                        // still in title-edit mode, the user
-                                        // clicked into the code — promote to
-                                        // code-edit so ↑↓ navigate within it.
-                                        if store.editStep == 1 { store.editStep = 2 }
-                                    },
-                                    onEnterEdit: { focusAndEnterEdit(at: i, step: 1, cursor: nil) },
-                                    onEnterEditAtTitle: { idx in
-                                        focusAndEnterEdit(at: i, step: 1, cursor: idx)
-                                    },
-                                    onEnterEditAtCode: { idx in
-                                        focusAndEnterEdit(at: i, step: 2, cursor: idx)
-                                    },
-                                    onCopy: { focusAndCopy(at: i) },
-                                    onTitleBeganEditing: {
-                                        // Title NSTextField started editing while
-                                        // we're in code-edit — the user clicked the
-                                        // title to switch focus. Mirror the
-                                        // code-side promotion that lives in
-                                        // onCursorFirstLine: drop pendingCursorIndex
-                                        // (AppKit's click already placed the cursor)
-                                        // and demote editStep so HighlightedCodeView
-                                        // releases first responder instead of
-                                        // stealing it back on the next render.
-                                        if store.editStep == 2 {
-                                            store.pendingCursorIndex = nil
-                                            store.editStep = 1
-                                        }
-                                    },
-                                    cursorTargetIndex: store.focusedIndex == i ? store.pendingCursorIndex : nil,
-                                    onCursorTargetConsumed: { store.pendingCursorIndex = nil }
-                                )
-                                .id(i)
-                                .overlay(alignment: .top) {
-                                    Rectangle()
-                                        .fill(Color.styleAccent(colorScheme, style: iconStyle))
-                                        .frame(height: 2)
-                                        .offset(y: -6)
-                                        .opacity(dropTargetIndex == i ? 1 : 0)
-                                }
-                                .onTapGesture { focusAndEnterEdit(at: i, step: 1, cursor: nil) }
-                                .dropDestination(for: String.self) { items, _ in
-                                    dropTargetIndex = nil
-                                    guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
-                                    guard let newIndex = store.moveSnippet(id: src, toOffset: i, tab: store.activeTab) else { return false }
-                                    store.focusedIndex = newIndex
-                                    return true
-                                } isTargeted: { targeted in
-                                    if targeted { dropTargetIndex = i }
-                                    else if dropTargetIndex == i { dropTargetIndex = nil }
-                                }
+                                snippetRow(at: i, nav: nav)
                             }
 
                             // Drop here to move the dragged snippet to the end.
@@ -181,6 +123,12 @@ struct SnippetListView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippets[i].code, forType: .string)
         postToast("Copied")
+        triggerCopyFlash(at: i)
+    }
+
+    private func triggerCopyFlash(at i: Int) {
+        copyFlashIndex = i
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { copyFlashIndex = nil }
     }
 
     private func focusAndEnterEdit(at i: Int, step: Int, cursor: Int?) {
@@ -192,6 +140,56 @@ struct SnippetListView: View {
         store.pendingCursorIndex = cursor
         store.editStep = step
         NotificationCenter.default.post(name: .editModeChanged, object: true)
+    }
+
+    @ViewBuilder
+    private func snippetRow(at i: Int, nav: ListNavState) -> some View {
+        let rowFocused: Bool = store.focusedIndex == i
+        let rowEditStep: Int = rowFocused ? store.editStep : 0
+        let isFlashing: Bool = copyFlashIndex.map { $0 == i } ?? false
+        SnippetRowView(
+            snippet: binding(for: i),
+            isFocused: rowFocused,
+            editStep: rowEditStep,
+            onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
+            onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
+            onCursorFirstLine: { isFirst in
+                nav.cursorOnFirstLine = isFirst
+                if store.editStep == 1 { store.editStep = 2 }
+            },
+            onEnterEdit: { focusAndEnterEdit(at: i, step: 1, cursor: nil) },
+            onEnterEditAtTitle: { idx in focusAndEnterEdit(at: i, step: 1, cursor: idx) },
+            onEnterEditAtCode: { idx in focusAndEnterEdit(at: i, step: 2, cursor: idx) },
+            onCopy: { focusAndCopy(at: i) },
+            onTitleBeganEditing: {
+                if store.editStep == 2 {
+                    store.pendingCursorIndex = nil
+                    store.editStep = 1
+                }
+            },
+            cursorTargetIndex: rowFocused ? store.pendingCursorIndex : nil,
+            onCursorTargetConsumed: { store.pendingCursorIndex = nil },
+            isCopying: isFlashing
+        )
+        .id(i)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.styleAccent(colorScheme, style: iconStyle))
+                .frame(height: 2)
+                .offset(y: -6)
+                .opacity(dropTargetIndex == i ? 1 : 0)
+        }
+        .onTapGesture { focusAndEnterEdit(at: i, step: 1, cursor: nil) }
+        .dropDestination(for: String.self) { items, _ in
+            dropTargetIndex = nil
+            guard let src = items.first.flatMap(UUID.init(uuidString:)) else { return false }
+            guard let newIndex = store.moveSnippet(id: src, toOffset: i, tab: store.activeTab) else { return false }
+            store.focusedIndex = newIndex
+            return true
+        } isTargeted: { targeted in
+            if targeted { dropTargetIndex = i }
+            else if dropTargetIndex == i { dropTargetIndex = nil }
+        }
     }
 
     private func binding(for index: Int) -> Binding<Snippet> {
@@ -209,7 +207,7 @@ struct SnippetListView: View {
         )
     }
 
-    private func makeKeyHandler(nav: ListNavState, store: SnippetStore) -> (NSEvent) -> Bool {
+    private func makeKeyHandler(nav: ListNavState, store: SnippetStore, onCopyFlash: @escaping (Int) -> Void) -> (NSEvent) -> Bool {
         { event in
             let snippets = store.tabs[store.activeTab]
             let tab = store.activeTab
@@ -339,6 +337,7 @@ struct SnippetListView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
                     postToast("Copied")
+                    onCopyFlash(i)
                 }
                 return true
 
@@ -384,6 +383,7 @@ struct SnippetListView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(formatted, forType: .string)
                     postToast("Copied")
+                    onCopyFlash(i)
                 }
                 return true
 
