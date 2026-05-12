@@ -96,9 +96,11 @@ struct SnippetRowView: View {
     var onTitleBeganEditing: () -> Void = {}
     var cursorTargetIndex: Int? = nil
     var onCursorTargetConsumed: () -> Void = {}
+    var isCopying: Bool = false
 
     private var isEditing: Bool { editStep > 0 }
     @State private var isHovering = false
+    @State private var copyScale: CGFloat = 1.0
     @AppStorage("fetchCodeWrap") private var codeWrap: Bool = false
     @AppStorage("fetchFontSize") private var storedFontSize: Double = 11
     @AppStorage("fetchTitleFontSize") private var storedTitleFontSize: Double = 11
@@ -131,6 +133,14 @@ struct SnippetRowView: View {
                     case .ended:
                         isHovering = false
                         NSCursor.arrow.set()
+                    }
+                }
+                .scaleEffect(copyScale)
+                .onChange(of: isCopying) { _, copying in
+                    guard copying else { return }
+                    withAnimation(.easeIn(duration: 0.08)) { copyScale = 0.95 }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.45)) { copyScale = 1.0 }
                     }
                 }
         }
