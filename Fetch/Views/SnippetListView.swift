@@ -5,7 +5,9 @@ import AppKit
 // they sync across the popover and the main window.
 @Observable
 private final class ListNavState {
-    var cursorOnFirstLine: Bool = true
+    var codeCursorOnFirstLine: Bool = true
+    var codeCursorOnLastLine: Bool = true
+    var noteCursorOnFirstLine: Bool = true
 }
 
 struct SnippetListView: View {
@@ -105,7 +107,9 @@ struct SnippetListView: View {
         .onChange(of: store.activeTab) { _, newTab in
             store.editStep = 0
             store.pendingDeleteIndex = nil
-            nav.cursorOnFirstLine = true
+            nav.codeCursorOnFirstLine = true
+            nav.codeCursorOnLastLine = true
+            nav.noteCursorOnFirstLine = true
             let tabSnippets = store.tabs[newTab]
             store.focusedIndex = tabSnippets.isEmpty ? nil : 0
         }
@@ -133,7 +137,14 @@ struct SnippetListView: View {
 
     private func focusAndEnterEdit(at i: Int, step: Int, cursor: Int?) {
         store.focusedIndex = i
-        guard store.editStep == 0 else { return }
+        guard store.editStep == 0 else {
+            // Already in edit mode on this row — just switch focus between fields.
+            if store.focusedIndex == i {
+                store.pendingCursorIndex = cursor
+                store.editStep = step
+            }
+            return
+        }
         let current = store.tabs[store.activeTab]
         guard i < current.count else { return }
         store.editSnapshot = current[i]
@@ -153,16 +164,33 @@ struct SnippetListView: View {
             editStep: rowEditStep,
             onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
             onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
-            onCursorFirstLine: { isFirst in
-                nav.cursorOnFirstLine = isFirst
-                if store.editStep == 1 { store.editStep = 2 }
+            onExpireChange: { store.tabs[store.activeTab][i].expiresAt = $0 },
+            onNoteChange: { newValue in
+                store.tabs[store.activeTab][i].note = newValue.isEmpty ? nil : newValue
+            },
+            onCodeCursorFirstLine: { isFirst in
+                nav.codeCursorOnFirstLine = isFirst
+                // Auto-sync: a cursor event from the code field means the user
+                // is now interacting with it; promote editStep so arrow keys
+                // route to the right field. Covers click-to-focus while another
+                // field was logically focused.
+                if store.editStep == 1 || store.editStep == 2 { store.editStep = 3 }
+            },
+            onCodeCursorLastLine: { isLast in
+                nav.codeCursorOnLastLine = isLast
+            },
+            onNoteCursorFirstLine: { isFirst in
+                nav.noteCursorOnFirstLine = isFirst
+                if store.editStep > 0 && store.editStep != 4 { store.editStep = 4 }
             },
             onEnterEdit: { focusAndEnterEdit(at: i, step: 1, cursor: nil) },
             onEnterEditAtTitle: { idx in focusAndEnterEdit(at: i, step: 1, cursor: idx) },
-            onEnterEditAtCode: { idx in focusAndEnterEdit(at: i, step: 2, cursor: idx) },
+            onEnterEditAtExpire: { focusAndEnterEdit(at: i, step: 2, cursor: nil) },
+            onEnterEditAtCode: { idx in focusAndEnterEdit(at: i, step: 3, cursor: idx) },
+            onEnterEditAtNote: { idx in focusAndEnterEdit(at: i, step: 4, cursor: idx) },
             onCopy: { focusAndCopy(at: i) },
             onTitleBeganEditing: {
-                if store.editStep == 2 {
+                if store.editStep > 0 && store.editStep != 1 {
                     store.pendingCursorIndex = nil
                     store.editStep = 1
                 }
@@ -288,33 +316,55 @@ struct SnippetListView: View {
                     exitEdit(copy: false); return true
 
                 case 36:                            // Enter / Shift+Enter
-                    if store.editStep == 2 && flags.contains(.shift) {
-                        return false                // Shift+Enter in code → newline (pass through)
+                    // Shift+Enter in multi-line fields (code or description) → newline.
+                    if (store.editStep == 3 || store.editStep == 4) && flags.contains(.shift) {
+                        return false
                     }
-                    exitEdit(copy: false)           // Enter → save + exit (no copy)
+                    exitEdit(copy: false)
                     return true
 
                 case 53:                            // Esc — save and exit (no copy)
                     exitEdit(copy: false); return true
 
-                case 48:                            // Tab / Shift+Tab — navigate fields
+                case 48:                            // Tab / Shift+Tab — cycle fields
+                    let stepCount = 4 // title, expire, code, description
+                    let cur = store.editStep
                     if flags.contains(.shift) {
-                        if store.editStep == 2 { store.editStep = 1 }   // code → title
+                        store.editStep = ((cur - 2 + stepCount) % stepCount) + 1
                     } else {
-                        if store.editStep == 1 { store.editStep = 2 }   // title → code
+                        store.editStep = (cur % stepCount) + 1
                     }
+                    store.pendingCursorIndex = nil
                     return true
 
                 case 125:                           // ↓
-                    if store.editStep == 1 { store.editStep = 2; return true } // title → code
-                    return false                    // in code: pass through (NSTextView navigates)
+                    switch store.editStep {
+                    case 1: store.editStep = 3; return true       // title → code
+                    case 2: store.editStep = 3; return true       // expire → code
+                    case 3:
+                        if nav.codeCursorOnLastLine {
+                            store.editStep = 4; return true       // code last line → description
+                        }
+                        return false                              // pass through to NSTextView
+                    default: return false                         // description: pass through
+                    }
 
                 case 126:                           // ↑
-                    if store.editStep == 1 { return true }          // in title: do nothing
-                    if store.editStep == 2 && nav.cursorOnFirstLine { // in code first line → title
-                        store.editStep = 1; return true
+                    switch store.editStep {
+                    case 1: return true                           // title: no-op
+                    case 2: return true                           // expire: no-op (same row)
+                    case 3:
+                        if nav.codeCursorOnFirstLine {
+                            store.editStep = 1; return true       // code first line → title
+                        }
+                        return false
+                    case 4:
+                        if nav.noteCursorOnFirstLine {
+                            store.editStep = 3; return true       // description first line → code
+                        }
+                        return false
+                    default: return false
                     }
-                    return false                    // in code: pass through
 
                 default:
                     return false                    // let typing reach text fields

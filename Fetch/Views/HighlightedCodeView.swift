@@ -10,6 +10,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     var fontSize: CGFloat = 11
     var onCodeChange: ((String) -> Void)?
     var onCursorFirstLine: ((Bool) -> Void)?
+    var onCursorLastLine: ((Bool) -> Void)?
     var onClick: ((Int) -> Void)?
     var cursorTargetIndex: Int? = nil
     var onCursorTargetConsumed: (() -> Void)? = nil
@@ -139,6 +140,7 @@ struct HighlightedCodeView: NSViewRepresentable {
         let coord = context.coordinator
         coord.onCodeChange = onCodeChange
         coord.onCursorFirstLine = onCursorFirstLine
+        coord.onCursorLastLine = onCursorLastLine
         coord.onClick = onClick
 
         if textView.isEditable != isEditing {
@@ -159,7 +161,7 @@ struct HighlightedCodeView: NSViewRepresentable {
                 let clamped = target.map { max(0, min($0, textView.string.utf16.count)) } ?? 0
                 textView.setSelectedRange(NSRange(location: clamped, length: 0))
                 textView.scrollRangeToVisible(NSRange(location: clamped, length: 0))
-                coord.onCursorFirstLine?(true)
+                coord.reportLineFlags(tv: textView)
                 if target != nil { onConsumed?() }
             }
         } else if !focusCode && wasCodeFocused && isEditing {
@@ -238,6 +240,7 @@ struct HighlightedCodeView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onCodeChange: ((String) -> Void)?
         var onCursorFirstLine: ((Bool) -> Void)?
+        var onCursorLastLine: ((Bool) -> Void)?
         var onClick: ((Int) -> Void)?
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
@@ -246,7 +249,7 @@ struct HighlightedCodeView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             onCodeChange?(tv.string)
-            reportFirstLine(tv)
+            reportLineFlags(tv: tv)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -256,21 +259,23 @@ struct HighlightedCodeView: NSViewRepresentable {
             // mode on this row): only report when the user is actually
             // focused in the code view.
             guard tv.window?.firstResponder === tv else { return }
-            reportFirstLine(tv)
+            reportLineFlags(tv: tv)
         }
 
-        private func reportFirstLine(_ tv: NSTextView) {
-            // Visual first line, not logical: when wrap is on, a long line
-            // wraps to multiple display lines and we need to know which one
-            // the cursor sits on.
+        // Visual first/last line, not logical: when wrap is on, a long line
+        // wraps to multiple display lines and we need to know which one the
+        // cursor sits on.
+        func reportLineFlags(tv: NSTextView) {
             guard let lm = tv.layoutManager, let tc = tv.textContainer else {
                 onCursorFirstLine?(true)
+                onCursorLastLine?(true)
                 return
             }
             lm.ensureLayout(for: tc)
             let totalGlyphs = lm.numberOfGlyphs
             guard totalGlyphs > 0 else {
                 onCursorFirstLine?(true)
+                onCursorLastLine?(true)
                 return
             }
             let cursorPos = tv.selectedRange().location
@@ -280,6 +285,8 @@ struct HighlightedCodeView: NSViewRepresentable {
             _ = lm.lineFragmentRect(forGlyphAt: glyphIdx,
                                     effectiveRange: &lineGlyphRange)
             onCursorFirstLine?(lineGlyphRange.location == 0)
+            let lineEnd = lineGlyphRange.location + lineGlyphRange.length
+            onCursorLastLine?(lineEnd >= totalGlyphs)
         }
     }
 }
