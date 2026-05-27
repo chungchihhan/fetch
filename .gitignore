@@ -2,7 +2,10 @@
 *.xcuserstate
 xcuserdata/
 .build/
+build/
 .superpowers/
 DerivedData/
 docs/default.profraw
 docs/
+*.profraw
+*.profdata

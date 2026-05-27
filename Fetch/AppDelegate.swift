@@ -15,6 +15,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // non-home display (multi-display fullscreen scenarios).
     private var popoverAnchorWindow: NSWindow?
     private var togglePopoverRetries = 0
+    // The status-item button lives in the system menu bar window (another
+    // process), so addGlobalMonitorForEvents sees the click that opens the
+    // popover. Action dispatch vs. monitor callback order isn't guaranteed
+    // and flips in another app's fullscreen Space, where the monitor fires
+    // *after* our action — closing the popover the same click just opened.
+    // We stamp the show time and ignore outside-clicks within a short
+    // grace window.
+    private var popoverShownAt: TimeInterval = 0
+    // After show, AppKit (with .canJoinAllSpaces) will quietly teleport the
+    // popover to the main display's active Space within ~500ms — unless that
+    // Space is occupied by another app in fullscreen. We pin the intended
+    // frame and restore on screen-change.
+    private var popoverIntendedFrame: NSRect = .zero
+    private var popoverIntendedScreen: NSScreen?
+    private var popoverScreenObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
@@ -249,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.popover.isShown else { return }
+            if ProcessInfo.processInfo.systemUptime - self.popoverShownAt < 0.25 { return }
             self.closePopover()
         }
         NotificationCenter.default.addObserver(
@@ -444,7 +460,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             win.collectionBehavior.insert(.fullScreenAuxiliary)
             win.level = .popUpMenu
             win.makeKey()
+            // .canJoinAllSpaces makes AppKit migrate the popover's host window
+            // to the main display's active Space within ~500ms unless that
+            // Space is occupied by a fullscreen app. Pin the intended frame
+            // and restore it if the screen changes while shown.
+            popoverIntendedFrame = win.frame
+            popoverIntendedScreen = win.screen
+            if let observer = popoverScreenObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            popoverScreenObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeScreenNotification,
+                object: win,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self, self.popover.isShown,
+                      let w = self.popover.contentViewController?.view.window,
+                      let intended = self.popoverIntendedScreen else { return }
+                if w.screen !== intended {
+                    w.setFrame(self.popoverIntendedFrame, display: true)
+                }
+            }
         }
+        popoverShownAt = ProcessInfo.processInfo.systemUptime
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .popoverDidOpen, object: nil)
         }
@@ -525,6 +563,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let anchor = popoverAnchorWindow {
             anchor.orderOut(nil)
             popoverAnchorWindow = nil
+        }
+        if let observer = popoverScreenObserver {
+            NotificationCenter.default.removeObserver(observer)
+            popoverScreenObserver = nil
         }
     }
 
