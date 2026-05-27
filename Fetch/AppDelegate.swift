@@ -425,10 +425,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // First call after launch can hit before NSStatusBar has positioned
         // the button into a menu bar — its window lands at unified (0, 0)
-        // until something nudges layout. Retry briefly until the button
-        // reports a menu-bar Y, then proceed.
+        // until something nudges layout. Retry briefly in that case only;
+        // a non-zero origin off-screen means the OS has parked the button
+        // because a fullscreen app is hiding the home menubar — retrying
+        // won't help, and the transient-anchor path handles it.
         if let frame = button.window?.frame,
-           !NSScreen.screens.contains(where: { abs($0.frame.maxY - frame.maxY) < 5 }),
+           frame.origin == .zero,
            togglePopoverRetries < 10 {
             togglePopoverRetries += 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -438,7 +440,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         togglePopoverRetries = 0
 
-        NSApp.activate(ignoringOtherApps: true)
+        // Pre-configure the reused popover window before show so that NSPopover
+        // assigns it to the correct Space (the user's active Space, e.g. Warp's
+        // fullscreen Space on the extended display) rather than defaulting to
+        // whatever Space it was last visible in.
+        if let existingWin = popover.contentViewController?.view.window {
+            existingWin.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            existingWin.level = NSWindow.Level(rawValue: 500)
+            existingWin.alphaValue = 1
+        }
 
         if let anchor = transientAnchorIfNeeded(for: button) {
             popoverAnchorWindow = anchor
@@ -447,18 +457,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
-        // Allow the popover's host window to appear over apps in their own
-        // full-screen Space and float above full-screen chrome. Use
-        // .popUpMenu (101) — GPU-rendered apps like Zed/Warp/Ghostty can
-        // composite above .statusBar (25) in their fullscreen Space, hiding
-        // the popover. alphaValue is reset because closePopover() drops it
-        // to 0 to suppress a tear-down frame, and the host window is
-        // sometimes reused across show cycles.
+
+        // kCGDraggingWindowLevel (500) clears GPU-rendered fullscreen apps.
+        // orderFrontRegardless forces the window into the active Space without
+        // requiring app activation — avoiding the Space switch that
+        // NSApp.activate(ignoringOtherApps:true) can trigger when Fetch has a
+        // main window on another display.
         if let win = popover.contentViewController?.view.window {
             win.alphaValue = 1
-            win.collectionBehavior.insert(.canJoinAllSpaces)
-            win.collectionBehavior.insert(.fullScreenAuxiliary)
-            win.level = .popUpMenu
+            win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            win.level = NSWindow.Level(rawValue: 500)
+            win.orderFrontRegardless()
             win.makeKey()
             // .canJoinAllSpaces makes AppKit migrate the popover's host window
             // to the main display's active Space within ~500ms unless that
@@ -515,29 +524,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard menuBarHidden || onDifferentScreen || buttonScreenMissing else { return nil }
 
         // Find the display the button visually lives on, even when its
-        // window's .screen property is nil.
+        // window's .screen property is nil. First try matching X+Y (button
+        // visible somewhere); if that fails (button parked off-screen because
+        // a fullscreen app on the home display has hidden the menubar), match
+        // X only — the parked button's X still tells us which display owns
+        // the menubar.
         let buttonScreenRect = buttonWindow.convertToScreen(button.frame)
-        let buttonHomeScreen = buttonScreen ?? NSScreen.screens.first(where: { screen in
-            let f = screen.frame
-            return buttonScreenRect.midX >= f.minX
-                && buttonScreenRect.midX < f.maxX
-                && buttonScreenRect.minY <= f.maxY + 1
-                && buttonScreenRect.maxY >= f.minY
-        }) ?? active
+        let buttonHomeScreen = buttonScreen
+            ?? NSScreen.screens.first(where: { screen in
+                let f = screen.frame
+                return buttonScreenRect.midX >= f.minX
+                    && buttonScreenRect.midX < f.maxX
+                    && buttonScreenRect.minY <= f.maxY + 1
+                    && buttonScreenRect.maxY >= f.minY
+            })
+            ?? NSScreen.screens.first(where: { screen in
+                let f = screen.frame
+                return buttonScreenRect.midX >= f.minX && buttonScreenRect.midX < f.maxX
+            })
+            ?? active
 
         let menuBarHeight: CGFloat = 24
+        // The menubar always sits at the top of the active screen. When the
+        // status-item button is parked off-screen (fullscreen app hiding the
+        // home menubar), buttonScreenRect.minY would drag the anchor off the
+        // active screen — so always pin Y to the active screen's top.
+        let anchorY: CGFloat = active.frame.maxY - menuBarHeight - 1
         let anchorX: CGFloat
-        let anchorY: CGFloat
         if buttonHomeScreen !== active {
-            // Different display from where the user is — translate the icon's
-            // offset-from-right to the active screen.
+            // Button on a different display — translate its offset-from-right
+            // to the active screen.
             let offset = buttonHomeScreen.frame.maxX - buttonScreenRect.midX
             anchorX = active.frame.maxX - offset
-            anchorY = active.frame.maxY - menuBarHeight - 1
         } else {
-            // Same display — anchor at the button's actual screen-rect center.
+            // Same display as cursor — button's X is the X where the icon
+            // would render on this screen's menubar.
             anchorX = buttonScreenRect.midX
-            anchorY = max(active.frame.maxY - menuBarHeight - 1, buttonScreenRect.minY - 1)
         }
         let anchorRect = NSRect(x: anchorX, y: anchorY, width: 1, height: 1)
         let window = NSWindow(
@@ -551,10 +573,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        window.level = .statusBar
+        window.level = NSWindow.Level(rawValue: 500)
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
         window.contentView = view
-        window.orderFront(nil)
+        window.orderFrontRegardless()
         return window
     }
 
