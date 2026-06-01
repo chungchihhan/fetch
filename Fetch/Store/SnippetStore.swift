@@ -6,7 +6,7 @@ final class SnippetStore {
     var tabs: [[Snippet]] = Array(repeating: [], count: 6)
     var activeTab: Int = 0
     var focusedIndex: Int? = nil
-    var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
+    var editStep: Int = 0          // 0=browse, 1=title, 2=expire, 3=code, 4=description
     var editSnapshot: Snippet? = nil   // snapshot taken when edit begins, used for undo
     var pendingDeleteIndex: Int? = nil // non-nil = confirm-delete overlay is up
     // One-shot cursor placement when entering edit via click; consumed by the
