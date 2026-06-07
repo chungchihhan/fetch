@@ -25,6 +25,7 @@
 		C9EABDCF36FD1FDDE19EBEC3 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F8708358A8707EAC2E9DEE /* SnippetStore.swift */; };
 		D0FA18D6A76A83D5E0168330 /* icon-smoulder.png in Resources */ = {isa = PBXBuildFile; fileRef = 317CD3994C0B7DED8F6BD6A9 /* icon-smoulder.png */; };
 		DBC323D9365155FCF2BA39D6 /* icon-foxfire.png in Resources */ = {isa = PBXBuildFile; fileRef = AB685B493432FDCD8F84428C /* icon-foxfire.png */; };
+		DC27A6AFD30DE75A8A3C033D /* UpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0D779FBC6DDC2E85B50E73 /* UpdaterTests.swift */; };
 		DE8A4F25B993EB91B6CCD608 /* HighlightedCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03DF2950170F4BC02E3684E /* HighlightedCodeView.swift */; };
 		E3913F6CA9E07F50FDE4741A /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A7E422386A5D498BC6EB9F /* SnippetStoreTests.swift */; };
 		EED7DA11CD8FA1102C2DD1B3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5F8777C9ABE883DC2DE1A33 /* SettingsView.swift */; };
@@ -66,6 +67,7 @@
 		D9CE6E80A6AAB46B7847AA5B /* Snippet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snippet.swift; sourceTree = "<group>"; };
 		DC349A2094125985259419FA /* FetchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FetchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6C9925CE1C248111B6D1E10 /* SnippetListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetListView.swift; sourceTree = "<group>"; };
+		FD0D779FBC6DDC2E85B50E73 /* UpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +104,7 @@
 			children = (
 				00A7E422386A5D498BC6EB9F /* SnippetStoreTests.swift */,
 				9FC305E8FD2079C6F10A275C /* SnippetTests.swift */,
+				FD0D779FBC6DDC2E85B50E73 /* UpdaterTests.swift */,
 			);
 			path = FetchTests;
 			sourceTree = "<group>";
@@ -255,6 +258,7 @@
 			files = (
 				E3913F6CA9E07F50FDE4741A /* SnippetStoreTests.swift in Sources */,
 				98F28FF32D2C2040DA1CB9A0 /* SnippetTests.swift in Sources */,
+				DC27A6AFD30DE75A8A3C033D /* UpdaterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
