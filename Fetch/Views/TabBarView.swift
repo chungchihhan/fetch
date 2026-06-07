@@ -17,7 +17,9 @@ struct TabBarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Tabs — left-aligned
+            // Tabs — left-aligned. fixedSize keeps the row at its natural width
+            // so the ⌘N labels never get compressed into a second line; the
+            // right-side name area absorbs any width squeeze instead.
             HStack(spacing: 4) {
                 ForEach(0..<6, id: \.self) { i in
                     Button("⌘\(i + 1)") { activeTab = i }
@@ -31,6 +33,8 @@ struct TabBarView: View {
                     }
                 }
             }
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
 
             // Right indicator — flexible, takes all remaining space, content trailing-aligned.
             // Priority: toast > Edit Mode > tab name field > tab name label.
@@ -288,6 +292,8 @@ private struct TabButtonBody: View {
     var body: some View {
         configuration.label
             .font(.system(size: CGFloat(tabFontSize), design: .monospaced))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(isActive ? accent : .primary.opacity(isHovering ? 0.80 : 0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)
