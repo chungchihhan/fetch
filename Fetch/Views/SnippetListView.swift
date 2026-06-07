@@ -28,6 +28,9 @@ struct SnippetListView: View {
             KeyMonitorView(
                 onKey: handler,
                 onWindowResignKey: {
+                    nav.cmdHoldTask?.cancel()
+                    nav.cmdHoldTask = nil
+                    nav.showTabSwitcher = false
                     guard store.editStep > 0 else { return }
                     let tab = store.activeTab
                     let currentSnippets = store.tabs[tab]
@@ -49,8 +52,11 @@ struct SnippetListView: View {
                     if cmdDown {
                         guard nav.cmdHoldTask == nil, !nav.showTabSwitcher else { return }
                         nav.cmdHoldTask = Task { @MainActor in
-                            try? await Task.sleep(for: .seconds(1))
-                            guard !Task.isCancelled else { return }
+                            do {
+                                try await Task.sleep(for: .seconds(1))
+                            } catch {
+                                return
+                            }
                             nav.showTabSwitcher = true
                             nav.cmdHoldTask = nil
                         }
