@@ -32,34 +32,34 @@ struct TabBarView: View {
                 }
             }
 
-            Spacer()
-
-            // Top-right indicator: toast takes precedence, otherwise "Edit Mode" while editing.
-            if let msg = toastMessage {
-                ShineText(
-                    text: msg,
-                    baseColor: Color.styleAccent(colorScheme, style: iconStyle)
-                )
-                .transition(.opacity)
-                .padding(.trailing, 12)
-            } else if store.editStep > 0 {
-                ShineText(text: "Edit Mode", baseColor: editAccent)
-                    .padding(.trailing, 12)
-            } else if isEditingTabName {
-                TabNameTextField(
-                    text: $editingName,
-                    onCommit: { confirmTabRename(name: $0) },
-                    onCancel: cancelTabRename
-                )
-                .frame(width: 80, height: 18)
-                .padding(.trailing, 12)
-            } else {
-                Text(store.tabNames[store.activeTab])
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(.primary.opacity(0.55))
-                    .padding(.trailing, 12)
-                    .onTapGesture { startTabRename() }
+            // Right indicator — flexible, takes all remaining space, content trailing-aligned.
+            // Priority: toast > Edit Mode > tab name field > tab name label.
+            Group {
+                if let msg = toastMessage {
+                    ShineText(
+                        text: msg,
+                        baseColor: Color.styleAccent(colorScheme, style: iconStyle)
+                    )
+                    .transition(.opacity)
+                } else if store.editStep > 0 {
+                    ShineText(text: "Edit Mode", baseColor: editAccent)
+                } else if isEditingTabName {
+                    TabNameTextField(
+                        text: $editingName,
+                        onCommit: { confirmTabRename(name: $0) },
+                        onCancel: cancelTabRename
+                    )
+                    .frame(height: 18)
+                } else {
+                    Text(store.tabNames[store.activeTab])
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.primary.opacity(0.55))
+                        .lineLimit(1)
+                        .onTapGesture { startTabRename() }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, 12)
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
@@ -141,59 +141,129 @@ private struct TabNameTextField: NSViewRepresentable {
     var onCommit: (String) -> Void
     var onCancel: () -> Void
 
-    func makeNSView(context: Context) -> AutoFocusTextField {
-        let field = AutoFocusTextField()
-        field.delegate = context.coordinator
-        field.isBezeled = false
-        field.drawsBackground = false
-        field.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        field.alignment = .right
-        field.focusRingType = .none
-        field.stringValue = text
-        return field
+    func makeNSView(context: Context) -> TabNameTextView {
+        let view = TabNameTextView()
+        view.coordinator = context.coordinator
+        view.delegate = context.coordinator
+        view.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        // Natural (left) layout — NOT right alignment. Right alignment hangs
+        // trailing whitespace past the container's right edge where it gets
+        // clipped. The view hugs its content width (see intrinsicContentSize)
+        // and SwiftUI pins it to the trailing edge, so it still reads as
+        // right-aligned while keeping trailing spaces on-screen.
+        view.alignment = .natural
+        view.isEditable = true
+        view.isSelectable = true
+        view.drawsBackground = false
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.textContainer?.maximumNumberOfLines = 1
+        view.textContainer?.lineBreakMode = .byClipping
+        view.textContainer?.widthTracksTextView = false
+        view.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.isHorizontallyResizable = true
+        view.isVerticallyResizable = false
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.string = text
+        return view
     }
 
-    func updateNSView(_ nsView: AutoFocusTextField, context: Context) {
-        if !context.coordinator.isEditing { nsView.stringValue = text }
+    func updateNSView(_ nsView: TabNameTextView, context: Context) {
+        if !context.coordinator.isEditing { nsView.string = text }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCommit: onCommit, onCancel: onCancel) }
+    // Size the field to its content width (trailing spaces included) so SwiftUI
+    // doesn't stretch it full-width. The trailing-aligned parent then pins this
+    // compact field to the right corner — reading as right-aligned.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: TabNameTextView, context: Context) -> CGSize? {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: nsView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        ]
+        let width = ceil((nsView.string as NSString).size(withAttributes: attrs).width) + 3
+        return CGSize(width: width, height: 18)
+    }
 
-    // Requests focus the moment it joins a window — avoids async timing races.
-    final class AutoFocusTextField: NSTextField {
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onCommit: onCommit, onCancel: onCancel)
+    }
+
+    // NSTextView preserves trailing whitespace; NSTextField's cell strips it in right-aligned mode.
+    final class TabNameTextView: NSTextView {
+        weak var coordinator: Coordinator?
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window else { return }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 window.makeFirstResponder(self)
-                self.selectText(nil)
+                self.selectAll(nil)
             }
+        }
+
+        // Hug the content width *including* trailing whitespace.
+        // NSString.size(withAttributes:) counts trailing spaces (unlike the
+        // line-fragment used rect), so the field stays wide enough to show
+        // the caret sitting after them. +3 leaves room for the caret itself.
+        override var intrinsicContentSize: NSSize {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+            ]
+            let width = ceil((string as NSString).size(withAttributes: attrs).width)
+            return NSSize(width: width + 3, height: NSView.noIntrinsicMetric)
+        }
+
+        override func didChangeText() {
+            super.didChangeText()
+            invalidateIntrinsicContentSize()
+        }
+
+        override func keyDown(with event: NSEvent) {
+            switch event.keyCode {
+            case 36: coordinator?.commit(string: string)  // Enter
+            case 53: coordinator?.cancel()                // Esc
+            default: super.keyDown(with: event)
+            }
+        }
+
+        override func resignFirstResponder() -> Bool {
+            let result = super.resignFirstResponder()
+            if result { coordinator?.commit(string: string) }
+            return result
         }
     }
 
-    final class Coordinator: NSObject, NSTextFieldDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
         var onCommit: (String) -> Void
         var onCancel: () -> Void
         var isEditing = false
 
-        init(onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        init(text: Binding<String>, onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+            self.text = text
             self.onCommit = onCommit
             self.onCancel = onCancel
         }
 
-        func controlTextDidBeginEditing(_ obj: Notification) { isEditing = true }
+        func textDidBeginEditing(_ notification: Notification) { isEditing = true }
 
-        func controlTextDidEndEditing(_ obj: Notification) {
-            guard isEditing else { return }  // ignore spurious end-editing before user types
+        // Push each keystroke to the binding so SwiftUI re-runs sizeThatFits and
+        // the field grows/shrinks to match — keeping it pinned at the right edge.
+        func textDidChange(_ notification: Notification) {
+            guard let tv = notification.object as? NSTextView else { return }
+            text.wrappedValue = tv.string
+        }
+
+        func commit(string: String) {
+            guard isEditing else { return }
             isEditing = false
-            guard let field = obj.object as? NSTextField else { return }
-            let movement = (obj.userInfo?["NSTextMovement"] as? Int) ?? 0
-            if movement == 17 { // NSEscapeTextMovement
-                onCancel()
-            } else {
-                onCommit(field.stringValue)
-            }
+            onCommit(string)
+        }
+
+        func cancel() {
+            guard isEditing else { return }
+            isEditing = false
+            onCancel()
         }
     }
 }
