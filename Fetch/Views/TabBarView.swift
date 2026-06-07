@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TabBarView: View {
     @Binding var activeTab: Int
@@ -9,7 +10,6 @@ struct TabBarView: View {
     @State private var toastTask: Task<Void, Never>? = nil
     @State private var isEditingTabName = false
     @State private var editingName = ""
-    @FocusState private var tabNameFieldFocused: Bool
 
     private var editAccent: Color {
         colorScheme == .dark ? Color(hex: "#e6cf5f") : Color(hex: "#b08a1e")
@@ -46,18 +46,13 @@ struct TabBarView: View {
                 ShineText(text: "Edit Mode", baseColor: editAccent)
                     .padding(.trailing, 12)
             } else if isEditingTabName {
-                TextField("", text: $editingName)
-                    .font(.system(size: 13, design: .monospaced))
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 80)
-                    .focused($tabNameFieldFocused)
-                    .onSubmit { confirmTabRename() }
-                    .onExitCommand { cancelTabRename() }
-                    .onChange(of: tabNameFieldFocused) { _, focused in
-                        if !focused && isEditingTabName { confirmTabRename() }
-                    }
-                    .padding(.trailing, 12)
+                TabNameTextField(
+                    text: $editingName,
+                    onCommit: { confirmTabRename(name: $0) },
+                    onCancel: cancelTabRename
+                )
+                .frame(width: 80, height: 18)
+                .padding(.trailing, 12)
             } else {
                 Text(store.tabNames[store.activeTab])
                     .font(.system(size: 13, design: .monospaced))
@@ -70,7 +65,6 @@ struct TabBarView: View {
         .padding(.top, 10)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.15), value: toastMessage)
-        .animation(.easeInOut(duration: 0.15), value: isEditingTabName)
         .onChange(of: store.activeTab) { _, _ in
             if isEditingTabName { cancelTabRename() }
         }
@@ -89,13 +83,12 @@ struct TabBarView: View {
     private func startTabRename() {
         editingName = store.tabNames[store.activeTab]
         isEditingTabName = true
-        tabNameFieldFocused = true
     }
 
-    private func confirmTabRename() {
-        isEditingTabName = false
-        let trimmed = editingName.trimmingCharacters(in: .whitespaces)
+    private func confirmTabRename(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
         store.renameTab(store.activeTab, name: trimmed.isEmpty ? "Tab \(store.activeTab + 1)" : trimmed)
+        isEditingTabName = false
     }
 
     private func cancelTabRename() {
@@ -137,6 +130,71 @@ private struct ShineText: View {
             startPoint: .leading,
             endPoint: .trailing
         )
+    }
+}
+
+// NSTextField-backed text field that reliably fires onCommit (Enter or click-away)
+// and onCancel (Esc) via AppKit delegate — SwiftUI's @FocusState doesn't detect
+// focus loss when clicks land on NSEvent-monitored views like the snippet list.
+private struct TabNameTextField: NSViewRepresentable {
+    @Binding var text: String
+    var onCommit: (String) -> Void
+    var onCancel: () -> Void
+
+    func makeNSView(context: Context) -> AutoFocusTextField {
+        let field = AutoFocusTextField()
+        field.delegate = context.coordinator
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        field.alignment = .right
+        field.focusRingType = .none
+        field.stringValue = text
+        return field
+    }
+
+    func updateNSView(_ nsView: AutoFocusTextField, context: Context) {
+        if !context.coordinator.isEditing { nsView.stringValue = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onCommit: onCommit, onCancel: onCancel) }
+
+    // Requests focus the moment it joins a window — avoids async timing races.
+    final class AutoFocusTextField: NSTextField {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                window.makeFirstResponder(self)
+                self.selectText(nil)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var onCommit: (String) -> Void
+        var onCancel: () -> Void
+        var isEditing = false
+
+        init(onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+            self.onCommit = onCommit
+            self.onCancel = onCancel
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) { isEditing = true }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard isEditing else { return }  // ignore spurious end-editing before user types
+            isEditing = false
+            guard let field = obj.object as? NSTextField else { return }
+            let movement = (obj.userInfo?["NSTextMovement"] as? Int) ?? 0
+            if movement == 17 { // NSEscapeTextMovement
+                onCancel()
+            } else {
+                onCommit(field.stringValue)
+            }
+        }
     }
 }
 

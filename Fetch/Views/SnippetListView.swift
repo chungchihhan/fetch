@@ -263,6 +263,12 @@ struct SnippetListView: View {
                 }
             }
 
+            // If a text field outside the snippet editor has focus (e.g. tab name field),
+            // pass all events through so AppKit can deliver them to that field.
+            if store.editStep == 0, event.window?.firstResponder is NSTextView {
+                return false
+            }
+
             // ⌘= / ⌘- — adjust snippet font size globally (works in any mode).
             if flags.contains(.command), event.keyCode == 24 || event.keyCode == 27 {
                 adjustFontSize(delta: event.keyCode == 24 ? 1 : -1)
