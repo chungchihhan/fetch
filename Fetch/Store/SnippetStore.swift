@@ -13,7 +13,7 @@ final class SnippetStore {
     var focusedIndex: Int? = nil
     var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
     var editSnapshot: Snippet? = nil   // snapshot taken when edit begins, used for undo
-    var tabNames: [String] = (1...6).map { "Tab \($0)" }
+    private(set) var tabNames: [String] = (1...6).map { "Tab \($0)" }
     var pendingDeleteIndex: Int? = nil // non-nil = confirm-delete overlay is up
     // One-shot cursor placement when entering edit via click; consumed by the
     // text field once it's focused, then cleared.
@@ -112,6 +112,7 @@ final class SnippetStore {
     }
 
     func renameTab(_ tab: Int, name: String) {
+        guard tabNames.indices.contains(tab) else { return }
         tabNames[tab] = name
         save(tab: tab)
     }
