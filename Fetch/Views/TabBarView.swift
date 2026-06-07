@@ -70,6 +70,10 @@ struct TabBarView: View {
         .padding(.top, 10)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.15), value: toastMessage)
+        .animation(.easeInOut(duration: 0.15), value: isEditingTabName)
+        .onChange(of: store.activeTab) { _, _ in
+            if isEditingTabName { cancelTabRename() }
+        }
         .overlay(Divider(), alignment: .bottom)
         .onReceive(NotificationCenter.default.publisher(for: .toastMessage)) { note in
             toastMessage = note.object as? String
