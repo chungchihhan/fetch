@@ -23,6 +23,13 @@ final class SnippetStore {
 
     private var storageDirectory: URL
 
+    // Per-tab guard: a tab may only be written to disk once we know its file is
+    // safe to overwrite — i.e. it loaded successfully OR no file existed yet.
+    // If a file exists but can't be read/decoded, we must NOT clobber it with
+    // the empty in-memory tab (the v1.3.0 data-loss bug). Defaults to true so a
+    // fresh install with no files can still save.
+    private var loadSucceeded: [Bool] = Array(repeating: true, count: 6)
+
     init(storageDirectory: URL = SnippetStore.defaultDirectory) {
         self.storageDirectory = storageDirectory
         loadAll()
@@ -118,6 +125,10 @@ final class SnippetStore {
     }
 
     func save(tab: Int) {
+        // Never overwrite a file we couldn't load — that's how empty in-memory
+        // tabs wipe real data on the next popover-close / quit.
+        guard loadSucceeded[tab] else { return }
+
         let url = fileURL(for: tab)
         let tmpURL = url.deletingLastPathComponent()
             .appendingPathComponent(UUID().uuidString + ".tmp")
@@ -125,6 +136,15 @@ final class SnippetStore {
             let file = TabFile(name: tabNames[tab], snippets: tabs[tab])
             let data = try JSONEncoder().encode(file)
             try data.write(to: tmpURL, options: .atomic)
+
+            // Keep the previous good version as a .bak so any future bug is
+            // recoverable without external backups.
+            if FileManager.default.fileExists(atPath: url.path) {
+                let bakURL = url.appendingPathExtension("bak")
+                try? FileManager.default.removeItem(at: bakURL)
+                try? FileManager.default.copyItem(at: url, to: bakURL)
+            }
+
             _ = try FileManager.default.replaceItemAt(url, withItemAt: tmpURL)
         } catch {
             try? FileManager.default.removeItem(at: tmpURL)
@@ -150,15 +170,35 @@ final class SnippetStore {
 
     func load(tab: Int) {
         let url = fileURL(for: tab)
-        guard let data = try? Data(contentsOf: url) else { return }
+
+        // No file yet (fresh install / never-used tab) — genuinely empty, and
+        // safe to write later.
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            loadSucceeded[tab] = true
+            return
+        }
+
+        // File exists but can't be read — do NOT allow an overwrite that would
+        // destroy it. Leave the tab empty in memory and block saves for it.
+        guard let data = try? Data(contentsOf: url) else {
+            loadSucceeded[tab] = false
+            return
+        }
+
         if let file = try? JSONDecoder().decode(TabFile.self, from: data) {
             tabs[tab] = file.snippets
             tabNames[tab] = file.name
+            loadSucceeded[tab] = true
         } else if let snippets = try? JSONDecoder().decode([Snippet].self, from: data) {
             // Old bare-array format — migrate silently.
             tabs[tab] = snippets
             tabNames[tab] = "Tab \(tab + 1)"
+            loadSucceeded[tab] = true
             save(tab: tab)
+        } else {
+            // File exists but matches no known format (corruption, partial
+            // write, or an unrecognized version). Preserve it — never clobber.
+            loadSucceeded[tab] = false
         }
     }
 
