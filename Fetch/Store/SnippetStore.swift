@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+private struct TabFile: Codable {
+    var name: String
+    var snippets: [Snippet]
+}
+
 @Observable
 final class SnippetStore {
     var tabs: [[Snippet]] = Array(repeating: [], count: 6)
@@ -8,6 +13,7 @@ final class SnippetStore {
     var focusedIndex: Int? = nil
     var editStep: Int = 0          // 0 = browse, 1 = title edit, 2 = code edit
     var editSnapshot: Snippet? = nil   // snapshot taken when edit begins, used for undo
+    var tabNames: [String] = (1...6).map { "Tab \($0)" }
     var pendingDeleteIndex: Int? = nil // non-nil = confirm-delete overlay is up
     // One-shot cursor placement when entering edit via click; consumed by the
     // text field once it's focused, then cleared.
@@ -105,12 +111,18 @@ final class SnippetStore {
         return moveSnippet(from: from, toOffset: toOffset, tab: tab)
     }
 
+    func renameTab(_ tab: Int, name: String) {
+        tabNames[tab] = name
+        save(tab: tab)
+    }
+
     func save(tab: Int) {
         let url = fileURL(for: tab)
         let tmpURL = url.deletingLastPathComponent()
             .appendingPathComponent(UUID().uuidString + ".tmp")
         do {
-            let data = try JSONEncoder().encode(tabs[tab])
+            let file = TabFile(name: tabNames[tab], snippets: tabs[tab])
+            let data = try JSONEncoder().encode(file)
             try data.write(to: tmpURL, options: .atomic)
             _ = try FileManager.default.replaceItemAt(url, withItemAt: tmpURL)
         } catch {
@@ -137,10 +149,16 @@ final class SnippetStore {
 
     func load(tab: Int) {
         let url = fileURL(for: tab)
-        guard let data = try? Data(contentsOf: url),
-              let snippets = try? JSONDecoder().decode([Snippet].self, from: data)
-        else { return }
-        tabs[tab] = snippets
+        guard let data = try? Data(contentsOf: url) else { return }
+        if let file = try? JSONDecoder().decode(TabFile.self, from: data) {
+            tabs[tab] = file.snippets
+            tabNames[tab] = file.name
+        } else if let snippets = try? JSONDecoder().decode([Snippet].self, from: data) {
+            // Old bare-array format — migrate silently.
+            tabs[tab] = snippets
+            tabNames[tab] = "Tab \(tab + 1)"
+            save(tab: tab)
+        }
     }
 
     private func loadAll() {
