@@ -53,7 +53,7 @@ struct SnippetListView: View {
                         guard nav.cmdHoldTask == nil, !nav.showTabSwitcher else { return }
                         nav.cmdHoldTask = Task { @MainActor in
                             do {
-                                try await Task.sleep(for: .seconds(1))
+                                try await Task.sleep(for: .seconds(0.3))
                             } catch {
                                 return
                             }
@@ -628,7 +628,7 @@ private struct TabSwitcherOverlay: View {
                     }
                 }
             }
-            .frame(width: 180)
+            .frame(width: 260)
             .padding(20)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 10))
