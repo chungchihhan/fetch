@@ -251,10 +251,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPopover() {
         popover = NSPopover()
-        let savedWidth  = UserDefaults.standard.double(forKey: "fetchWidth")
+        var savedWidth  = UserDefaults.standard.double(forKey: "fetchWidth")
         let savedHeight = UserDefaults.standard.double(forKey: "fetchHeight")
+        // Clamp any previously-saved width up to the current minimum so the
+        // wider floor takes effect even for users who shrank the popover before.
+        if savedWidth > 0, savedWidth < 460 {
+            savedWidth = 460
+            UserDefaults.standard.set(savedWidth, forKey: "fetchWidth")
+        }
         popover.contentSize = NSSize(
-            width:  savedWidth  > 0 ? savedWidth  : 380,
+            width:  savedWidth  > 0 ? savedWidth  : 460,
             height: savedHeight > 0 ? savedHeight : 300
         )
         popover.behavior = .applicationDefined
