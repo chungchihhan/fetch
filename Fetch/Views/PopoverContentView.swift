@@ -4,7 +4,7 @@ struct PopoverContentView: View {
     @Environment(SnippetStore.self) var store
     @State private var isEditing = false
     @AppStorage("fetchHeight") private var height: Double = 300
-    @AppStorage("fetchWidth") private var width: Double = 380
+    @AppStorage("fetchWidth") private var width: Double = 460
     @AppStorage("fetchColorScheme") private var colorSchemeKey: String = "system"
 
     private var preferredScheme: ColorScheme? {
@@ -108,7 +108,7 @@ private struct ResizeWidthDragView: NSViewRepresentable {
         let v = WidthDragNSView()
         v.onWidth = { newWidth in
             let screenWidth = Double(NSScreen.main?.visibleFrame.width ?? 1200) - 40
-            width = max(400, min(screenWidth, newWidth))
+            width = max(460, min(screenWidth, newWidth))
             NotificationCenter.default.post(name: .widthChanged, object: CGFloat(width))
         }
         return v
