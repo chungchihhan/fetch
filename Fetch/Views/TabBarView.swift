@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TabBarView: View {
     @Binding var activeTab: Int
@@ -7,6 +8,8 @@ struct TabBarView: View {
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
+    @State private var isEditingTabName = false
+    @State private var editingName = ""
 
     private var editAccent: Color {
         colorScheme == .dark ? Color(hex: "#e6cf5f") : Color(hex: "#b08a1e")
@@ -14,7 +17,9 @@ struct TabBarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Tabs — left-aligned
+            // Tabs — left-aligned. fixedSize keeps the row at its natural width
+            // so the ⌘N labels never get compressed into a second line; the
+            // right-side name area absorbs any width squeeze instead.
             HStack(spacing: 4) {
                 ForEach(0..<6, id: \.self) { i in
                     Button("⌘\(i + 1)") { activeTab = i }
@@ -28,26 +33,45 @@ struct TabBarView: View {
                     }
                 }
             }
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
 
-            Spacer()
-
-            // Top-right indicator: toast takes precedence, otherwise "Edit Mode" while editing.
-            if let msg = toastMessage {
-                ShineText(
-                    text: msg,
-                    baseColor: Color.styleAccent(colorScheme, style: iconStyle)
-                )
-                .transition(.opacity)
-                .padding(.trailing, 12)
-            } else if store.editStep > 0 {
-                ShineText(text: "Edit Mode", baseColor: editAccent)
-                    .padding(.trailing, 12)
+            // Right indicator — flexible, takes all remaining space, content trailing-aligned.
+            // Priority: toast > Edit Mode > tab name field > tab name label.
+            Group {
+                if let msg = toastMessage {
+                    ShineText(
+                        text: msg,
+                        baseColor: Color.styleAccent(colorScheme, style: iconStyle)
+                    )
+                    .transition(.opacity)
+                } else if store.editStep > 0 {
+                    ShineText(text: "Edit Mode", baseColor: editAccent)
+                } else if isEditingTabName {
+                    TabNameTextField(
+                        text: $editingName,
+                        onCommit: { confirmTabRename(name: $0) },
+                        onCancel: cancelTabRename
+                    )
+                    .frame(height: 18)
+                } else {
+                    Text(store.tabNames[store.activeTab])
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.primary.opacity(0.55))
+                        .lineLimit(1)
+                        .onTapGesture { startTabRename() }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, 12)
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.15), value: toastMessage)
+        .onChange(of: store.activeTab) { _, _ in
+            if isEditingTabName { cancelTabRename() }
+        }
         .overlay(Divider(), alignment: .bottom)
         .onReceive(NotificationCenter.default.publisher(for: .toastMessage)) { note in
             toastMessage = note.object as? String
@@ -58,6 +82,21 @@ struct TabBarView: View {
                 await MainActor.run { toastMessage = nil }
             }
         }
+    }
+
+    private func startTabRename() {
+        editingName = store.tabNames[store.activeTab]
+        isEditingTabName = true
+    }
+
+    private func confirmTabRename(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        store.renameTab(store.activeTab, name: trimmed.isEmpty ? "Tab \(store.activeTab + 1)" : trimmed)
+        isEditingTabName = false
+    }
+
+    private func cancelTabRename() {
+        isEditingTabName = false
     }
 }
 
@@ -98,6 +137,141 @@ private struct ShineText: View {
     }
 }
 
+// NSTextField-backed text field that reliably fires onCommit (Enter or click-away)
+// and onCancel (Esc) via AppKit delegate — SwiftUI's @FocusState doesn't detect
+// focus loss when clicks land on NSEvent-monitored views like the snippet list.
+private struct TabNameTextField: NSViewRepresentable {
+    @Binding var text: String
+    var onCommit: (String) -> Void
+    var onCancel: () -> Void
+
+    func makeNSView(context: Context) -> TabNameTextView {
+        let view = TabNameTextView()
+        view.coordinator = context.coordinator
+        view.delegate = context.coordinator
+        view.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        // Natural (left) layout — NOT right alignment. Right alignment hangs
+        // trailing whitespace past the container's right edge where it gets
+        // clipped. The view hugs its content width (see intrinsicContentSize)
+        // and SwiftUI pins it to the trailing edge, so it still reads as
+        // right-aligned while keeping trailing spaces on-screen.
+        view.alignment = .natural
+        view.isEditable = true
+        view.isSelectable = true
+        view.drawsBackground = false
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.textContainer?.maximumNumberOfLines = 1
+        view.textContainer?.lineBreakMode = .byClipping
+        view.textContainer?.widthTracksTextView = false
+        view.textContainer?.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.isHorizontallyResizable = true
+        view.isVerticallyResizable = false
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.string = text
+        return view
+    }
+
+    func updateNSView(_ nsView: TabNameTextView, context: Context) {
+        if !context.coordinator.isEditing { nsView.string = text }
+    }
+
+    // Size the field to its content width (trailing spaces included) so SwiftUI
+    // doesn't stretch it full-width. The trailing-aligned parent then pins this
+    // compact field to the right corner — reading as right-aligned.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: TabNameTextView, context: Context) -> CGSize? {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: nsView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        ]
+        let width = ceil((nsView.string as NSString).size(withAttributes: attrs).width) + 3
+        return CGSize(width: width, height: 18)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onCommit: onCommit, onCancel: onCancel)
+    }
+
+    // NSTextView preserves trailing whitespace; NSTextField's cell strips it in right-aligned mode.
+    final class TabNameTextView: NSTextView {
+        weak var coordinator: Coordinator?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                window.makeFirstResponder(self)
+                self.selectAll(nil)
+            }
+        }
+
+        // Hug the content width *including* trailing whitespace.
+        // NSString.size(withAttributes:) counts trailing spaces (unlike the
+        // line-fragment used rect), so the field stays wide enough to show
+        // the caret sitting after them. +3 leaves room for the caret itself.
+        override var intrinsicContentSize: NSSize {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+            ]
+            let width = ceil((string as NSString).size(withAttributes: attrs).width)
+            return NSSize(width: width + 3, height: NSView.noIntrinsicMetric)
+        }
+
+        override func didChangeText() {
+            super.didChangeText()
+            invalidateIntrinsicContentSize()
+        }
+
+        override func keyDown(with event: NSEvent) {
+            switch event.keyCode {
+            case 36: coordinator?.commit(string: string)  // Enter
+            case 53: coordinator?.cancel()                // Esc
+            default: super.keyDown(with: event)
+            }
+        }
+
+        override func resignFirstResponder() -> Bool {
+            let result = super.resignFirstResponder()
+            if result { coordinator?.commit(string: string) }
+            return result
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        var onCommit: (String) -> Void
+        var onCancel: () -> Void
+        var isEditing = false
+
+        init(text: Binding<String>, onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+            self.text = text
+            self.onCommit = onCommit
+            self.onCancel = onCancel
+        }
+
+        func textDidBeginEditing(_ notification: Notification) { isEditing = true }
+
+        // Push each keystroke to the binding so SwiftUI re-runs sizeThatFits and
+        // the field grows/shrinks to match — keeping it pinned at the right edge.
+        func textDidChange(_ notification: Notification) {
+            guard let tv = notification.object as? NSTextView else { return }
+            text.wrappedValue = tv.string
+        }
+
+        func commit(string: String) {
+            guard isEditing else { return }
+            isEditing = false
+            onCommit(string)
+        }
+
+        func cancel() {
+            guard isEditing else { return }
+            isEditing = false
+            onCancel()
+        }
+    }
+}
+
 struct TabButtonStyle: ButtonStyle {
     var isActive: Bool
     func makeBody(configuration: Configuration) -> some View {
@@ -118,6 +292,8 @@ private struct TabButtonBody: View {
     var body: some View {
         configuration.label
             .font(.system(size: CGFloat(tabFontSize), design: .monospaced))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(isActive ? accent : .primary.opacity(isHovering ? 0.80 : 0.55))
             .padding(.vertical, 3)
             .padding(.horizontal, 12)

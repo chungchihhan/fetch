@@ -6,6 +6,8 @@ import AppKit
 @Observable
 private final class ListNavState {
     var cursorOnFirstLine: Bool = true
+    var showTabSwitcher: Bool = false
+    var cmdHoldTask: Task<Void, Never>? = nil
 }
 
 struct SnippetListView: View {
@@ -26,6 +28,9 @@ struct SnippetListView: View {
             KeyMonitorView(
                 onKey: handler,
                 onWindowResignKey: {
+                    nav.cmdHoldTask?.cancel()
+                    nav.cmdHoldTask = nil
+                    nav.showTabSwitcher = false
                     guard store.editStep > 0 else { return }
                     let tab = store.activeTab
                     let currentSnippets = store.tabs[tab]
@@ -41,6 +46,25 @@ struct SnippetListView: View {
                     store.editStep = 0
                     store.save(tab: tab)
                     NotificationCenter.default.post(name: .editModeChanged, object: false)
+                },
+                onFlagsChanged: { event in
+                    let cmdDown = event.modifierFlags.contains(.command)
+                    if cmdDown {
+                        guard nav.cmdHoldTask == nil, !nav.showTabSwitcher else { return }
+                        nav.cmdHoldTask = Task { @MainActor in
+                            do {
+                                try await Task.sleep(for: .seconds(0.3))
+                            } catch {
+                                return
+                            }
+                            nav.showTabSwitcher = true
+                            nav.cmdHoldTask = nil
+                        }
+                    } else {
+                        nav.cmdHoldTask?.cancel()
+                        nav.cmdHoldTask = nil
+                        nav.showTabSwitcher = false
+                    }
                 }
             )
             .frame(width: 0, height: 0)
@@ -101,7 +125,15 @@ struct SnippetListView: View {
                     onCancel: { store.pendingDeleteIndex = nil }
                 )
             }
+
+            if nav.showTabSwitcher {
+                TabSwitcherOverlay(
+                    tabNames: store.tabNames,
+                    activeTab: store.activeTab
+                )
+            }
         }
+        .animation(.easeInOut(duration: 0.12), value: nav.showTabSwitcher)
         .onChange(of: store.activeTab) { _, newTab in
             store.editStep = 0
             store.pendingDeleteIndex = nil
@@ -212,6 +244,30 @@ struct SnippetListView: View {
             let snippets = store.tabs[store.activeTab]
             let tab = store.activeTab
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            // Cancel any pending cmd-hold when any key fires (e.g. normal ⌘1 tab switch).
+            nav.cmdHoldTask?.cancel()
+            nav.cmdHoldTask = nil
+
+            // ─── Tab switcher overlay ────────────────────────────────────────────────
+            if nav.showTabSwitcher {
+                switch event.keyCode {
+                case 18: store.activeTab = 0; nav.showTabSwitcher = false; return true  // 1
+                case 19: store.activeTab = 1; nav.showTabSwitcher = false; return true  // 2
+                case 20: store.activeTab = 2; nav.showTabSwitcher = false; return true  // 3
+                case 21: store.activeTab = 3; nav.showTabSwitcher = false; return true  // 4
+                case 23: store.activeTab = 4; nav.showTabSwitcher = false; return true  // 5
+                case 22: store.activeTab = 5; nav.showTabSwitcher = false; return true  // 6
+                case 53: nav.showTabSwitcher = false; return true                       // Esc
+                default: return true  // swallow all other keys while switcher is visible
+                }
+            }
+
+            // If a text field outside the snippet editor has focus (e.g. tab name field),
+            // pass all events through so AppKit can deliver them to that field.
+            if store.editStep == 0, event.window?.firstResponder is NSTextView {
+                return false
+            }
 
             // ⌘= / ⌘- — adjust snippet font size globally (works in any mode).
             if flags.contains(.command), event.keyCode == 24 || event.keyCode == 27 {
@@ -419,29 +475,35 @@ struct SnippetListView: View {
 struct KeyMonitorView: NSViewRepresentable {
     let onKey: (NSEvent) -> Bool
     var onWindowResignKey: (() -> Void)? = nil
+    var onFlagsChanged: ((NSEvent) -> Void)? = nil
 
     func makeNSView(context: Context) -> KeyCatchingNSView {
         let v = KeyCatchingNSView()
         v.onKey = onKey
         v.onWindowResignKey = onWindowResignKey
+        v.onFlagsChanged = onFlagsChanged
         return v
     }
 
     func updateNSView(_ nsView: KeyCatchingNSView, context: Context) {
         nsView.onKey = onKey
         nsView.onWindowResignKey = onWindowResignKey
+        nsView.onFlagsChanged = onFlagsChanged
     }
 }
 
 final class KeyCatchingNSView: NSView {
     var onKey: ((NSEvent) -> Bool)?
     var onWindowResignKey: (() -> Void)?
+    var onFlagsChanged: ((NSEvent) -> Void)?
     private var localMonitor: Any?
+    private var flagsMonitor: Any?
     private var resignObserver: Any?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let m = localMonitor { NSEvent.removeMonitor(m); localMonitor = nil }
+        if let m = flagsMonitor { NSEvent.removeMonitor(m); flagsMonitor = nil }
         if let o = resignObserver { NotificationCenter.default.removeObserver(o); resignObserver = nil }
         guard let window else { return }
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -451,6 +513,12 @@ final class KeyCatchingNSView: NSView {
             guard let self, let selfWindow = self.window,
                   event.window === selfWindow else { return event }
             return self.onKey?(event) == true ? nil : event
+        }
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            guard let self, let selfWindow = self.window,
+                  event.window === selfWindow else { return event }
+            self.onFlagsChanged?(event)
+            return event
         }
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification,
@@ -463,6 +531,7 @@ final class KeyCatchingNSView: NSView {
 
     deinit {
         if let m = localMonitor { NSEvent.removeMonitor(m) }
+        if let m = flagsMonitor { NSEvent.removeMonitor(m) }
         if let o = resignObserver { NotificationCenter.default.removeObserver(o) }
     }
 }
@@ -524,6 +593,49 @@ struct DeleteConfirmOverlay: View {
                     .stroke(Color.primary.opacity(0.15), lineWidth: 1)
             )
             .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+    }
+}
+
+private struct TabSwitcherOverlay: View {
+    let tabNames: [String]
+    let activeTab: Int
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+
+            VStack(spacing: 8) {
+                ForEach(0..<6, id: \.self) { i in
+                    HStack(spacing: 8) {
+                        Text("[\(i + 1)]")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.primary.opacity(0.40))
+                            .frame(width: 28, alignment: .leading)
+                        Text(tabNames[i])
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(
+                                i == activeTab
+                                    ? Color.styleAccent(colorScheme, style: iconStyle)
+                                    : .primary
+                            )
+                        Spacer()
+                    }
+                }
+            }
+            .frame(width: 260)
+            .padding(20)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+            )
         }
         .transition(.opacity)
     }
