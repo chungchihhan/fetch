@@ -7,6 +7,9 @@ struct TabBarView: View {
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
+    @State private var isEditingTabName = false
+    @State private var editingName = ""
+    @FocusState private var tabNameFieldFocused: Bool
 
     private var editAccent: Color {
         colorScheme == .dark ? Color(hex: "#e6cf5f") : Color(hex: "#b08a1e")
@@ -42,6 +45,25 @@ struct TabBarView: View {
             } else if store.editStep > 0 {
                 ShineText(text: "Edit Mode", baseColor: editAccent)
                     .padding(.trailing, 12)
+            } else if isEditingTabName {
+                TextField("", text: $editingName)
+                    .font(.system(size: 13, design: .monospaced))
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    .focused($tabNameFieldFocused)
+                    .onSubmit { confirmTabRename() }
+                    .onExitCommand { cancelTabRename() }
+                    .onChange(of: tabNameFieldFocused) { _, focused in
+                        if !focused && isEditingTabName { confirmTabRename() }
+                    }
+                    .padding(.trailing, 12)
+            } else {
+                Text(store.tabNames[store.activeTab])
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(.primary.opacity(0.55))
+                    .padding(.trailing, 12)
+                    .onTapGesture { startTabRename() }
             }
         }
         .padding(.horizontal, 12)
@@ -58,6 +80,22 @@ struct TabBarView: View {
                 await MainActor.run { toastMessage = nil }
             }
         }
+    }
+
+    private func startTabRename() {
+        editingName = store.tabNames[store.activeTab]
+        isEditingTabName = true
+        tabNameFieldFocused = true
+    }
+
+    private func confirmTabRename() {
+        isEditingTabName = false
+        let trimmed = editingName.trimmingCharacters(in: .whitespaces)
+        store.renameTab(store.activeTab, name: trimmed.isEmpty ? "Tab \(store.activeTab + 1)" : trimmed)
+    }
+
+    private func cancelTabRename() {
+        isEditingTabName = false
     }
 }
 
