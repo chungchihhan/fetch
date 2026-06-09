@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // still hear about new releases without the user quitting.
     private func startUpdateCheckTimer() {
         updateCheckTimer?.invalidate()
-        let timer = Timer(timeInterval: 86_400, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 259_200, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.runUpdateCheck() }
         }
         RunLoop.main.add(timer, forMode: .common)
