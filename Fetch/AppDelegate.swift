@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // still hear about new releases without the user quitting.
     private func startUpdateCheckTimer() {
         updateCheckTimer?.invalidate()
-        let timer = Timer(timeInterval: 86_400, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 259_200, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.runUpdateCheck() }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -465,16 +465,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // kCGDraggingWindowLevel (500) clears GPU-rendered fullscreen apps.
-        // orderFrontRegardless forces the window into the active Space without
-        // requiring app activation — avoiding the Space switch that
-        // NSApp.activate(ignoringOtherApps:true) can trigger when Fetch has a
-        // main window on another display.
+        // orderFrontRegardless forces the window into the active Space.
+        // makeKey() + activate() transfers keyboard focus to the popover.
+        // The Space-switch risk from activate() is avoided because the popover
+        // already has .canJoinAllSpaces set above — macOS finds the key window
+        // in the current Space and doesn't need to switch.
         if let win = popover.contentViewController?.view.window {
             win.alphaValue = 1
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             win.level = NSWindow.Level(rawValue: 500)
             win.orderFrontRegardless()
             win.makeKey()
+            NSApp.activate(ignoringOtherApps: true)
             // .canJoinAllSpaces makes AppKit migrate the popover's host window
             // to the main display's active Space within ~500ms unless that
             // Space is occupied by a fullscreen app. Pin the intended frame
