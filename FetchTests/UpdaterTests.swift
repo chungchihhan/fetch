@@ -59,22 +59,60 @@ final class UpdaterTests: XCTestCase {
     func test_backUpData_prunesOldBackupsKeepingLatestFive() throws {
         try "[]".write(to: dataDir.appendingPathComponent("tab1.json"), atomically: true, encoding: .utf8)
 
+        let fm = FileManager.default
         let updater = Updater()
-        // Seed 5 old backups directly in the backup folder
+        // Seed 5 old backups with explicit, increasing creation dates so the
+        // oldest is unambiguous regardless of folder-name ordering.
         let backupRoot = dataDir.appendingPathComponent("backup")
-        try FileManager.default.createDirectory(at: backupRoot, withIntermediateDirectories: true)
+        try fm.createDirectory(at: backupRoot, withIntermediateDirectories: true)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
         for i in 1...5 {
-            let old = backupRoot.appendingPathComponent("pre-update-0.0.\(i)-20260101-00000\(i)")
-            try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+            let old = backupRoot.appendingPathComponent("pre-update-0.0.\(i)-seed")
+            try fm.createDirectory(at: old, withIntermediateDirectories: true)
+            try fm.setAttributes([.creationDate: base.addingTimeInterval(Double(i))], ofItemAtPath: old.path)
         }
 
         updater.backUpData(dataDirectory: dataDir)
 
-        let remaining = try FileManager.default.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
+        let remaining = try fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("pre-update-") }
         XCTAssertEqual(remaining.count, 5, "should keep exactly 5 backups")
-        XCTAssertFalse(remaining.contains { $0.lastPathComponent == "pre-update-0.0.1-20260101-000001" },
-                       "oldest backup should have been pruned")
+        XCTAssertFalse(remaining.contains { $0.lastPathComponent == "pre-update-0.0.1-seed" },
+                       "oldest backup (earliest creation date) should have been pruned")
+    }
+
+    /// Pruning ranks by creation date, not folder name — so a higher version
+    /// number that sorts lower as a string (1.10 < 1.9) is still kept when newer.
+    func test_backUpData_prunesByCreationDateNotName() throws {
+        try "[]".write(to: dataDir.appendingPathComponent("tab1.json"), atomically: true, encoding: .utf8)
+
+        let fm = FileManager.default
+        let backupRoot = dataDir.appendingPathComponent("backup")
+        try fm.createDirectory(at: backupRoot, withIntermediateDirectories: true)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        // Names that sort the OPPOSITE of chronological order: "1.10.0" < "1.9.0"
+        // as strings, but 1.10.0 is the newer (later-created) backup.
+        let older = backupRoot.appendingPathComponent("pre-update-1.9.0-x")
+        let newer = backupRoot.appendingPathComponent("pre-update-1.10.0-x")
+        try fm.createDirectory(at: older, withIntermediateDirectories: true)
+        try fm.createDirectory(at: newer, withIntermediateDirectories: true)
+        try fm.setAttributes([.creationDate: base], ofItemAtPath: older.path)
+        try fm.setAttributes([.creationDate: base.addingTimeInterval(100)], ofItemAtPath: newer.path)
+        // Pad so that with the real backup added below there are 6 total,
+        // and exactly one (the oldest) gets pruned.
+        for i in 1...3 {
+            let pad = backupRoot.appendingPathComponent("pre-update-2.0.\(i)-x")
+            try fm.createDirectory(at: pad, withIntermediateDirectories: true)
+            try fm.setAttributes([.creationDate: base.addingTimeInterval(Double(200 + i))], ofItemAtPath: pad.path)
+        }
+
+        Updater().backUpData(dataDirectory: dataDir)
+
+        let names = try fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
+            .map(\.lastPathComponent)
+            .filter { $0.hasPrefix("pre-update-") }
+        XCTAssertFalse(names.contains("pre-update-1.9.0-x"), "the older backup should be pruned")
+        XCTAssertTrue(names.contains("pre-update-1.10.0-x"), "the newer backup must survive despite its lower-sorting name")
     }
 
     /// No data directory yet (fresh install) — backup is a no-op, not a crash.

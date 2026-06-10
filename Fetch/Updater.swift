@@ -67,14 +67,24 @@ final class Updater {
 
     private func pruneBackups(in backupRoot: URL, keeping maxCount: Int) {
         let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil) else { return }
+        guard let entries = try? fm.contentsOfDirectory(
+            at: backupRoot,
+            includingPropertiesForKeys: [.creationDateKey]
+        ) else { return }
+        // Sort by creation date, not name: the version sits before the
+        // timestamp in the folder name, so a string sort would rank
+        // pre-update-1.10.0 below pre-update-1.9.0 and prune the newest first.
         let backups = entries
             .filter { $0.lastPathComponent.hasPrefix("pre-update-") }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .sorted { creationDate(of: $0) < creationDate(of: $1) }
         guard backups.count > maxCount else { return }
         for old in backups.prefix(backups.count - maxCount) {
             try? fm.removeItem(at: old)
         }
+    }
+
+    private func creationDate(of url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
     }
 
     @MainActor
