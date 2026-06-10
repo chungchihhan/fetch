@@ -36,8 +36,9 @@ final class Updater {
     /// Snapshot the user's snippet data before applying an update, so a bad
     /// release can't cost them their snippets. Best-effort: returns the backup
     /// location, or nil if there was nothing to back up (or the copy failed).
-    /// The backup is written to a `fetch-backups` folder *beside* the data
-    /// directory so it isn't itself loaded or overwritten.
+    /// Backups live at <dataDir>/backup/pre-update-<version>-<timestamp>.
+    /// The backup/ subfolder is excluded from each snapshot to prevent nesting.
+    /// Only the 5 most recent backups are kept; older ones are pruned.
     @discardableResult
     func backUpData(dataDirectory: URL? = nil) -> URL? {
         let fm = FileManager.default
@@ -48,15 +49,31 @@ final class Updater {
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let stamp = formatter.string(from: Date())
 
-        let backupRoot = dataDir.deletingLastPathComponent().appendingPathComponent("fetch-backups")
+        let backupRoot = dataDir.appendingPathComponent("backup")
         let dest = backupRoot.appendingPathComponent("pre-update-\(currentVersion)-\(stamp)")
 
         do {
-            try fm.createDirectory(at: backupRoot, withIntermediateDirectories: true)
-            try fm.copyItem(at: dataDir, to: dest)
+            try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+            let items = try fm.contentsOfDirectory(at: dataDir, includingPropertiesForKeys: nil)
+            for item in items where item.lastPathComponent != "backup" {
+                try fm.copyItem(at: item, to: dest.appendingPathComponent(item.lastPathComponent))
+            }
+            pruneBackups(in: backupRoot, keeping: 5)
             return dest
         } catch {
             return nil
+        }
+    }
+
+    private func pruneBackups(in backupRoot: URL, keeping maxCount: Int) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil) else { return }
+        let backups = entries
+            .filter { $0.lastPathComponent.hasPrefix("pre-update-") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard backups.count > maxCount else { return }
+        for old in backups.prefix(backups.count - maxCount) {
+            try? fm.removeItem(at: old)
         }
     }
 

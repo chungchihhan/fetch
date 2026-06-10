@@ -31,15 +31,50 @@ final class UpdaterTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: copied, encoding: .utf8), contents, "backup must be a faithful copy")
     }
 
-    /// The backup must live OUTSIDE the data directory, so it isn't itself
-    /// loaded, copied on a directory change, or clobbered by the next save.
-    func test_backUpData_storesBackupOutsideDataDirectory() throws {
+    /// The backup must live inside <dataDir>/backup/, not at the top level of
+    /// the data directory, so the snapshot isn't itself loaded as snippet data.
+    func test_backUpData_storesBackupInsideBackupSubfolder() throws {
         try "[]".write(to: dataDir.appendingPathComponent("tab1.json"), atomically: true, encoding: .utf8)
 
         let backup = try XCTUnwrap(Updater().backUpData(dataDirectory: dataDir))
 
-        XCTAssertFalse(backup.path.hasPrefix(dataDir.path + "/"),
-                       "backup should not be nested inside the data directory")
+        let backupSubfolder = dataDir.appendingPathComponent("backup")
+        XCTAssertTrue(backup.path.hasPrefix(backupSubfolder.path + "/"),
+                      "backup should be inside dataDir/backup/")
+    }
+
+    /// The backup folder must not contain a nested backup/ subfolder — copying
+    /// the data dir while excluding backup/ prevents exponential growth.
+    func test_backUpData_excludesBackupFolderFromSnapshot() throws {
+        try "[]".write(to: dataDir.appendingPathComponent("tab1.json"), atomically: true, encoding: .utf8)
+
+        let backup = try XCTUnwrap(Updater().backUpData(dataDirectory: dataDir))
+
+        let nested = backup.appendingPathComponent("backup")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: nested.path),
+                       "snapshot should not contain a nested backup/ folder")
+    }
+
+    /// After more than 5 backups, only the 5 most recent should remain.
+    func test_backUpData_prunesOldBackupsKeepingLatestFive() throws {
+        try "[]".write(to: dataDir.appendingPathComponent("tab1.json"), atomically: true, encoding: .utf8)
+
+        let updater = Updater()
+        // Seed 5 old backups directly in the backup folder
+        let backupRoot = dataDir.appendingPathComponent("backup")
+        try FileManager.default.createDirectory(at: backupRoot, withIntermediateDirectories: true)
+        for i in 1...5 {
+            let old = backupRoot.appendingPathComponent("pre-update-0.0.\(i)-20260101-00000\(i)")
+            try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        }
+
+        updater.backUpData(dataDirectory: dataDir)
+
+        let remaining = try FileManager.default.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("pre-update-") }
+        XCTAssertEqual(remaining.count, 5, "should keep exactly 5 backups")
+        XCTAssertFalse(remaining.contains { $0.lastPathComponent == "pre-update-0.0.1-20260101-000001" },
+                       "oldest backup should have been pruned")
     }
 
     /// No data directory yet (fresh install) — backup is a no-op, not a crash.
