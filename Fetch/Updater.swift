@@ -24,6 +24,69 @@ final class Updater {
         return Self.compare(latest, currentVersion) > 0
     }
 
+    /// The snippet data directory, resolved the same way AppDelegate builds the
+    /// store: the user's custom path if set, otherwise ~/.config/fetch.
+    static func resolvedDataDirectory() -> URL {
+        let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
+        return savedPath.isEmpty
+            ? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/fetch")
+            : URL(fileURLWithPath: savedPath)
+    }
+
+    /// Snapshot the user's snippet data before applying an update, so a bad
+    /// release can't cost them their snippets. Best-effort: returns the backup
+    /// location, or nil if there was nothing to back up (or the copy failed).
+    /// Backups live at <dataDir>/backup/pre-update-<version>-<timestamp>.
+    /// The backup/ subfolder is excluded from each snapshot to prevent nesting.
+    /// Only the 5 most recent backups are kept; older ones are pruned.
+    @discardableResult
+    func backUpData(dataDirectory: URL? = nil) -> URL? {
+        let fm = FileManager.default
+        let dataDir = dataDirectory ?? Self.resolvedDataDirectory()
+        guard fm.fileExists(atPath: dataDir.path) else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stamp = formatter.string(from: Date())
+
+        let backupRoot = dataDir.appendingPathComponent("backup")
+        let dest = backupRoot.appendingPathComponent("pre-update-\(currentVersion)-\(stamp)")
+
+        do {
+            try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+            let items = try fm.contentsOfDirectory(at: dataDir, includingPropertiesForKeys: nil)
+            for item in items where item.lastPathComponent != "backup" {
+                try fm.copyItem(at: item, to: dest.appendingPathComponent(item.lastPathComponent))
+            }
+            pruneBackups(in: backupRoot, keeping: 5)
+            return dest
+        } catch {
+            return nil
+        }
+    }
+
+    private func pruneBackups(in backupRoot: URL, keeping maxCount: Int) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: backupRoot,
+            includingPropertiesForKeys: [.creationDateKey]
+        ) else { return }
+        // Sort by creation date, not name: the version sits before the
+        // timestamp in the folder name, so a string sort would rank
+        // pre-update-1.10.0 below pre-update-1.9.0 and prune the newest first.
+        let backups = entries
+            .filter { $0.lastPathComponent.hasPrefix("pre-update-") }
+            .sorted { creationDate(of: $0) < creationDate(of: $1) }
+        guard backups.count > maxCount else { return }
+        for old in backups.prefix(backups.count - maxCount) {
+            try? fm.removeItem(at: old)
+        }
+    }
+
+    private func creationDate(of url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+    }
+
     @MainActor
     func checkForUpdates(silent: Bool = false) async {
         if !silent { statusMessage = "Checking…" }
@@ -63,6 +126,11 @@ final class Updater {
     func installUpdate(completion: ((Bool) -> Void)? = nil) {
         guard !isInstalling else { return }
         isInstalling = true
+
+        // Snapshot the user's data before replacing the app, in case the new
+        // version mishandles it. Best-effort — never blocks the update.
+        statusMessage = "Backing up your snippets…"
+        backUpData()
         statusMessage = "Downloading and installing…"
 
         let cmd = #"""
