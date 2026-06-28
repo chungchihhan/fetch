@@ -371,6 +371,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover?.isShown == true {
             closePopover()
         }
+
+        // The Carbon global hotkey works WITHOUT Accessibility, so the user can reach
+        // this feature while still untrusted — in which case the synthetic Cmd+V would
+        // silently no-op. Prompt for the grant instead; the snippet is already on the
+        // clipboard, so they can paste manually in the meantime.
+        guard AXIsProcessTrusted() else {
+            AppDelegate.promptForAccessibility()
+            return
+        }
+
         // Hand keyboard focus back to the app the user was in, then paste.
         // Safe to activate immediately: popover.animates is false, so performClose
         // above is synchronous and the popover window has already resigned key.
@@ -382,9 +392,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Open the Accessibility prompt (and System Settings pane) so the user can
+    // grant the permission synthetic key events require.
+    private static func promptForAccessibility() {
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+    }
+
     // Synthesize a Cmd+V keystroke. virtualKey 9 is the hardware keycode for V
-    // on every Mac keyboard layout. Requires Accessibility permission, which the
-    // app already holds for the global hotkey.
+    // on every Mac keyboard layout. Requires Accessibility trust (AXIsProcessTrusted);
+    // the caller verifies that before invoking this.
     private static func simulatePaste() {
         let src = CGEventSource(stateID: .hidSystemState)
         guard let down = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true),
