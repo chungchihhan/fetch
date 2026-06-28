@@ -3,7 +3,7 @@ import Highlightr
 
 struct HighlightedCodeView: NSViewRepresentable {
     var code: String
-    var language: String
+    var language: String = "auto"
     var isEditing: Bool
     var focusCode: Bool = false
     var wrapCode: Bool = false
@@ -18,6 +18,20 @@ struct HighlightedCodeView: NSViewRepresentable {
 
     private static let highlightr: Highlightr? = Highlightr()
     private static var currentTheme: String = ""
+
+    // Sentinel meaning "let Highlightr auto-detect the language".
+    static let autoLanguage = "auto"
+    // Render with no syntax highlighting at all.
+    static let plainLanguage = "plaintext"
+
+    // Languages Highlightr/highlight.js can highlight, alphabetically sorted.
+    // Computed once on first access (it crosses into JS). "plaintext" is always
+    // offered so the user can turn highlighting off for a snippet.
+    static let supportedLanguages: [String] = {
+        var langs = highlightr?.supportedLanguages() ?? []
+        if !langs.contains(plainLanguage) { langs.append(plainLanguage) }
+        return langs.sorted()
+    }()
 
     private var theme: String { colorScheme == .dark ? "atom-one-dark" : "atom-one-light" }
 
@@ -180,8 +194,23 @@ struct HighlightedCodeView: NSViewRepresentable {
                 textView.string = code
                 textView.textColor = .labelColor
             }
-        } else if justStoppedEditing || textView.string != code || coord.renderedTheme != theme {
-            if let highlighted = Self.highlightr?.highlight(code, as: language) {
+        } else if justStoppedEditing || textView.string != code
+                    || coord.renderedTheme != theme || coord.renderedLanguage != language {
+            // "plaintext" → no highlighting at all.
+            if language == Self.plainLanguage {
+                textView.string = code
+                textView.textColor = .labelColor
+                coord.renderedTheme = theme
+                coord.renderedLanguage = language
+                if let lm = textView.layoutManager, let tc = textView.textContainer {
+                    lm.ensureLayout(for: tc)
+                }
+                return
+            }
+            // "auto" → let Highlightr detect the language (as: nil); otherwise
+            // highlight as the language the user picked from the dropdown.
+            let asLanguage: String? = language == Self.autoLanguage ? nil : language
+            if let highlighted = Self.highlightr?.highlight(code, as: asLanguage, fastRender: true) {
                 let result = NSMutableAttributedString(attributedString: highlighted)
                 let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
                 result.addAttribute(.font, value: font,
@@ -189,10 +218,12 @@ struct HighlightedCodeView: NSViewRepresentable {
                 Self.boostCommentContrast(in: result, dark: colorScheme == .dark)
                 textView.textStorage?.setAttributedString(result)
                 coord.renderedTheme = theme
+                coord.renderedLanguage = language
             } else {
                 textView.string = code
                 textView.textColor = .labelColor
                 coord.renderedTheme = theme
+                coord.renderedLanguage = language
             }
         }
 
@@ -242,6 +273,7 @@ struct HighlightedCodeView: NSViewRepresentable {
         var wasEditing: Bool = false
         var wasCodeFocused: Bool = false
         var renderedTheme: String = ""
+        var renderedLanguage: String = ""
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
