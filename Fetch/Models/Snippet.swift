@@ -6,7 +6,7 @@ struct Snippet: Identifiable, Codable, Equatable {
     var code: String
     var language: String
 
-    init(id: UUID = UUID(), title: String, code: String, language: String = "bash") {
+    init(id: UUID = UUID(), title: String, code: String, language: String = "auto") {
         self.id = id
         self.title = title
         self.code = code
