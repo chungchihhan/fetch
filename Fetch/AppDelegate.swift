@@ -634,6 +634,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func popoverWillClose() {
         store.saveAll()
+        // Clear the captured app on every close so a stale reference can never
+        // receive a paste. The auto-paste handler reads previousApp into a local
+        // before calling closePopover(), so nilling here doesn't affect that path.
+        previousApp = nil
         if let anchor = popoverAnchorWindow {
             anchor.orderOut(nil)
             popoverAnchorWindow = nil
