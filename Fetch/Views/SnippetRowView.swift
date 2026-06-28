@@ -88,6 +88,7 @@ struct SnippetRowView: View {
     var editStep: Int        // 0=browse, 1=title edit, 2=code edit
     var onTitleChange: (String) -> Void
     var onCodeChange: (String) -> Void
+    var onOpenLanguagePicker: () -> Void = {}
     var onCursorFirstLine: ((Bool) -> Void)? = nil
     var onEnterEdit: () -> Void = {}
     var onEnterEditAtTitle: (Int) -> Void = { _ in }
@@ -184,6 +185,9 @@ struct SnippetRowView: View {
                             }
                         }
                     Spacer(minLength: 0)
+                    if isFocused || isHovering {
+                        LanguageTag(language: snippet.language, action: onOpenLanguagePicker)
+                    }
                     CopyIconButton(action: onCopy, isRowFocused: isFocused)
                 }
             }
@@ -248,6 +252,23 @@ struct SnippetRowView: View {
         if isFocused { return Color.styleAccent(colorScheme, style: iconStyle).opacity(0.70) }
         if isHovering { return Color.primary.opacity(0.20) }
         return Color.primary.opacity(0.10)
+    }
+}
+
+// Compact per-snippet language indicator. Tapping it (or pressing L on the
+// focused row) opens the keyboard-driven language picker overlay.
+private struct LanguageTag: View {
+    let language: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(language == HighlightedCodeView.autoLanguage ? "auto" : language)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.primary.opacity(0.5))
+        }
+        .buttonStyle(.plain)
+        .help("Syntax highlighting language (press L)")
     }
 }
 

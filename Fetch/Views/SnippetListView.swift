@@ -8,6 +8,40 @@ private final class ListNavState {
     var cursorOnFirstLine: Bool = true
     var showTabSwitcher: Bool = false
     var cmdHoldTask: Task<Void, Never>? = nil
+
+    // Language picker overlay state.
+    var showLanguagePicker: Bool = false
+    var langSearch: String = ""
+    var langSearchActive: Bool = false   // true once `/` (or a letter) starts a search
+    var langSelectedIndex: Int = 0       // index into the filtered right-column list
+    var starredLanguages: [String] = loadStarredLanguages()  // user quick picks (excludes "auto")
+}
+
+// Quick-pick languages shown in the picker's left column, selectable by
+// pressing 1–9. Star-toggled from the right column and persisted. "auto" is
+// always pinned first and is not stored in this list.
+private let defaultStarredLanguages = ["bash", HighlightedCodeView.plainLanguage]
+// Bumped so updating to this version resets the quick picks to the new
+// default (auto + bash + plaintext) rather than keeping the old long list.
+private let starredDefaultsKey = "fetchStarredLanguagesV2"
+
+private func loadStarredLanguages() -> [String] {
+    UserDefaults.standard.stringArray(forKey: starredDefaultsKey) ?? defaultStarredLanguages
+}
+
+// Full left-column list: "auto" pinned first, then the user's starred picks.
+private func quickPicks(_ starred: [String]) -> [String] {
+    [HighlightedCodeView.autoLanguage] + starred
+}
+
+// All languages matching the search (case-insensitive substring). Empty search
+// returns the full list. Shared by the key handler and the overlay so the
+// highlighted row and what Enter selects always agree.
+private func filteredLanguages(_ search: String) -> [String] {
+    let all = HighlightedCodeView.supportedLanguages
+    let query = search.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !query.isEmpty else { return all }
+    return all.filter { $0.contains(query) }
 }
 
 struct SnippetListView: View {
@@ -132,8 +166,22 @@ struct SnippetListView: View {
                     activeTab: store.activeTab
                 )
             }
+
+            if nav.showLanguagePicker, let i = store.focusedIndex, i < snippets.count {
+                LanguagePickerOverlay(
+                    current: snippets[i].language,
+                    search: nav.langSearch,
+                    searchActive: nav.langSearchActive,
+                    selectedIndex: nav.langSelectedIndex,
+                    starred: nav.starredLanguages,
+                    onSelect: { setLanguage($0, at: i, nav: nav) },
+                    onToggleStar: { toggleStar($0, nav: nav) },
+                    onClose: { nav.showLanguagePicker = false }
+                )
+            }
         }
         .animation(.easeInOut(duration: 0.12), value: nav.showTabSwitcher)
+        .animation(.easeInOut(duration: 0.12), value: nav.showLanguagePicker)
         .onChange(of: store.activeTab) { _, newTab in
             store.editStep = 0
             store.pendingDeleteIndex = nil
@@ -174,6 +222,36 @@ struct SnippetListView: View {
         NotificationCenter.default.post(name: .editModeChanged, object: true)
     }
 
+    private func openLanguagePicker(at i: Int, nav: ListNavState) {
+        guard store.editStep == 0 else { return }
+        let snippets = store.tabs[store.activeTab]
+        guard i < snippets.count else { return }
+        store.focusedIndex = i
+        nav.langSearch = ""
+        nav.langSearchActive = false
+        nav.langSelectedIndex = max(0, filteredLanguages("").firstIndex(of: snippets[i].language) ?? 0)
+        nav.showLanguagePicker = true
+    }
+
+    private func toggleStar(_ lang: String, nav: ListNavState) {
+        guard lang != HighlightedCodeView.autoLanguage else { return }
+        if let idx = nav.starredLanguages.firstIndex(of: lang) {
+            nav.starredLanguages.remove(at: idx)
+        } else {
+            nav.starredLanguages.append(lang)
+        }
+        UserDefaults.standard.set(nav.starredLanguages, forKey: starredDefaultsKey)
+    }
+
+    private func setLanguage(_ lang: String, at i: Int, nav: ListNavState) {
+        let tab = store.activeTab
+        guard i < store.tabs[tab].count else { return }
+        store.tabs[tab][i].language = lang
+        store.save(tab: tab)
+        nav.showLanguagePicker = false
+        postToast(lang == HighlightedCodeView.autoLanguage ? "Language: auto-detect" : "Language: \(lang)")
+    }
+
     @ViewBuilder
     private func snippetRow(at i: Int, nav: ListNavState) -> some View {
         let rowFocused: Bool = store.focusedIndex == i
@@ -185,6 +263,7 @@ struct SnippetListView: View {
             editStep: rowEditStep,
             onTitleChange: { store.tabs[store.activeTab][i].title = $0 },
             onCodeChange: { store.tabs[store.activeTab][i].code = $0 },
+            onOpenLanguagePicker: { openLanguagePicker(at: i, nav: nav) },
             onCursorFirstLine: { isFirst in
                 nav.cursorOnFirstLine = isFirst
                 if store.editStep == 1 { store.editStep = 2 }
@@ -260,6 +339,85 @@ struct SnippetListView: View {
                 case 22: store.activeTab = 5; nav.showTabSwitcher = false; return true  // 6
                 case 53: nav.showTabSwitcher = false; return true                       // Esc
                 default: return true  // swallow all other keys while switcher is visible
+                }
+            }
+
+            // ─── Language picker overlay ─────────────────────────────────────
+            if nav.showLanguagePicker {
+                guard let i = store.focusedIndex, i < snippets.count else {
+                    nav.showLanguagePicker = false
+                    return true
+                }
+                let filtered = filteredLanguages(nav.langSearch)
+                let chars = event.charactersIgnoringModifiers ?? ""
+
+                switch event.keyCode {
+                case 53:  // Esc — leave search first, then close
+                    if nav.langSearchActive {
+                        nav.langSearchActive = false
+                        nav.langSearch = ""
+                        nav.langSelectedIndex = 0
+                    } else {
+                        nav.showLanguagePicker = false
+                    }
+                    return true
+                case 36:  // Enter — select highlighted
+                    if nav.langSelectedIndex < filtered.count {
+                        setLanguage(filtered[nav.langSelectedIndex], at: i, nav: nav)
+                    }
+                    return true
+                case 125: // ↓
+                    if !filtered.isEmpty {
+                        nav.langSelectedIndex = min(filtered.count - 1, nav.langSelectedIndex + 1)
+                    }
+                    return true
+                case 126: // ↑
+                    if !filtered.isEmpty {
+                        nav.langSelectedIndex = max(0, nav.langSelectedIndex - 1)
+                    }
+                    return true
+                case 51:  // Delete — edit search text
+                    if nav.langSearchActive, !nav.langSearch.isEmpty {
+                        nav.langSearch.removeLast()
+                        nav.langSelectedIndex = 0
+                    }
+                    return true
+                default:
+                    break
+                }
+
+                // Don't consume modifier combos for typed input.
+                if flags.contains(.command) || flags.contains(.control) || flags.contains(.option) {
+                    return true
+                }
+
+                if !nav.langSearchActive {
+                    // 1–9 select a quick-pick language from the left column.
+                    let quick = quickPicks(nav.starredLanguages)
+                    if chars.count == 1, let n = Int(chars), (1...min(9, quick.count)).contains(n) {
+                        setLanguage(quick[n - 1], at: i, nav: nav)
+                        return true
+                    }
+                    // `/` opens search; any other letter opens search with that letter.
+                    if chars == "/" {
+                        nav.langSearchActive = true
+                        nav.langSearch = ""
+                        nav.langSelectedIndex = 0
+                    } else if chars.count == 1, let s = chars.unicodeScalars.first,
+                              CharacterSet.letters.contains(s) {
+                        nav.langSearchActive = true
+                        nav.langSearch = chars
+                        nav.langSelectedIndex = 0
+                    }
+                    return true
+                } else {
+                    // Search active: build the query from printable characters.
+                    if chars.count == 1, let s = chars.unicodeScalars.first,
+                       CharacterSet.alphanumerics.contains(s) || "+-#._".contains(chars) {
+                        nav.langSearch += chars
+                        nav.langSelectedIndex = 0
+                    }
+                    return true
                 }
             }
 
@@ -399,6 +557,12 @@ struct SnippetListView: View {
 
             case 14 where flags == .command:        // ⌘E — enter edit mode
                 enterEdit(); return true
+
+            case 37 where flags.isEmpty:            // L — open language picker
+                if let i = store.focusedIndex, i < snippets.count {
+                    openLanguagePicker(at: i, nav: nav)
+                }
+                return true
 
             case 125 where flags.contains(.option): // ⌥↓ — move focused snippet down
                 if let i = store.focusedIndex, i < snippets.count - 1,
@@ -638,6 +802,183 @@ private struct TabSwitcherOverlay: View {
             )
         }
         .transition(.opacity)
+    }
+}
+
+// Keyboard-driven language picker. All key handling lives in the list's key
+// monitor; this view is purely presentational and reflects the nav state.
+private struct LanguagePickerOverlay: View {
+    let current: String
+    let search: String
+    let searchActive: Bool
+    let selectedIndex: Int
+    let starred: [String]
+    let onSelect: (String) -> Void
+    let onToggleStar: (String) -> Void
+    let onClose: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
+
+    private var accent: Color { Color.styleAccent(colorScheme, style: iconStyle) }
+
+    // Both columns share this height so the scrollable list lines up with the
+    // quick column instead of overflowing past it.
+    private let panelHeight: CGFloat = 224
+
+    var body: some View {
+        let filtered = filteredLanguages(search)
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { onClose() }
+
+            VStack(alignment: .leading, spacing: 10) {
+                searchBar
+                HStack(alignment: .top, spacing: 12) {
+                    quickColumn
+                    Divider()
+                    allColumn(filtered)
+                }
+                .frame(height: panelHeight)
+                Text("1–9 quick · / search · ↑↓ move · ↵ select · esc close")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .padding(16)
+            .frame(width: 400)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .transition(.opacity)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            if searchActive {
+                // Cursor hugs the typed text (no gap in front of it).
+                HStack(spacing: 1) {
+                    Text(search)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    Rectangle()
+                        .fill(accent)
+                        .frame(width: 1.5, height: 15)
+                }
+            } else {
+                Text(search.isEmpty ? "Press / to search" : search)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(search.isEmpty ? .secondary : .primary)
+            }
+            Spacer()
+        }
+        .padding(8)
+        .background(Color.primary.opacity(searchActive ? 0.10 : 0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(searchActive ? accent.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private var quickColumn: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("QUICK")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
+            ForEach(Array(quickPicks(starred).enumerated()), id: \.element) { idx, lang in
+                Button { onSelect(lang) } label: {
+                    HStack(spacing: 6) {
+                        Text(idx < 9 ? "\(idx + 1)" : "·")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(accent)
+                            .frame(width: 15, alignment: .trailing)
+                        Text(lang)
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(lang == current ? accent : .primary)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(width: 140, alignment: .leading)
+    }
+
+    private func allColumn(_ filtered: [String]) -> some View {
+      VStack(alignment: .leading, spacing: 3) {
+        Text("ALL")
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .padding(.bottom, 2)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(Array(filtered.enumerated()), id: \.element) { idx, lang in
+                        let isSelected = idx == selectedIndex
+                        let isStarred = starred.contains(lang)
+                        HStack(spacing: 6) {
+                            // Clickable star: toggles the language in/out of the
+                            // left quick-pick column.
+                            Button { onToggleStar(lang) } label: {
+                                Image(systemName: isStarred ? "star.fill" : "star")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(isSelected ? Color.white
+                                                     : (isStarred ? accent : .secondary))
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: 15)
+
+                            Button { onSelect(lang) } label: {
+                                HStack(spacing: 6) {
+                                    Text(lang)
+                                        .font(.system(size: 13, design: .monospaced))
+                                        .foregroundStyle(isSelected ? Color.white
+                                                         : (lang == current ? accent : .primary))
+                                    Spacer(minLength: 0)
+                                    if lang == current {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(isSelected ? Color.white : accent)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(isSelected ? accent.opacity(0.9) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .id(idx)
+                    }
+                    if filtered.isEmpty {
+                        Text("No match")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                    }
+                }
+            }
+            .onChange(of: selectedIndex) { _, idx in
+                withAnimation(.easeOut(duration: 0.1)) { proxy.scrollTo(idx, anchor: .center) }
+            }
+        }
+      }
+      .frame(width: 200)
     }
 }
 
