@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("fetchIconStyle") private var iconStyle: String = "foxfire"
     @AppStorage("fetchDisplayMode") private var displayMode: String = "both"
     @AppStorage("fetchConfirmDelete") private var confirmDelete: Bool = true
+    @AppStorage("fetchAutoPaste") private var autoPaste: Bool = false
     @State private var updater = Updater.shared
     @State private var selectedTab = 0
 
@@ -305,6 +306,21 @@ struct SettingsView: View {
                         }
                         Spacer()
                         Toggle("", isOn: $confirmDelete)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
+                    Divider()
+                    settingRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Auto-paste on Enter")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text("Close Fetch and paste into your last focused input")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $autoPaste)
                             .toggleStyle(.switch)
                             .labelsHidden()
                     }
