@@ -2,9 +2,9 @@ import XCTest
 @testable import Fetch
 
 final class SnippetTests: XCTestCase {
-    func test_snippet_defaultLanguage_isBash() {
+    func test_snippet_defaultLanguage_isAuto() {
         let s = Snippet(title: "Hello", code: "echo hi")
-        XCTAssertEqual(s.language, "bash")
+        XCTAssertEqual(s.language, "auto")
     }
 
     func test_snippet_encodeDecode_roundtrip() throws {
