@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popoverIntendedFrame: NSRect = .zero
     private var popoverIntendedScreen: NSScreen?
     private var popoverScreenObserver: Any?
+    // The app that was frontmost when the popover opened. Captured before Fetch
+    // activates itself so auto-paste can return focus to it before pasting.
+    private var previousApp: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedPath = UserDefaults.standard.string(forKey: "fetchDataDirectory") ?? ""
@@ -67,6 +70,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(handleClosePopover),
             name: .closePopover,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleClosePopoverAndPaste),
+            name: .closePopoverAndPaste,
             object: nil
         )
         applyIconStyle(UserDefaults.standard.string(forKey: "fetchIconStyle") ?? "foxfire")
@@ -356,6 +365,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func handleClosePopoverAndPaste() {
+        let target = previousApp
+        previousApp = nil           // consume once; don't let a stale app get a spurious paste
+        if popover?.isShown == true {
+            closePopover()
+        }
+
+        // The Carbon global hotkey works WITHOUT Accessibility, so the user can reach
+        // this feature while still untrusted — in which case the synthetic Cmd+V would
+        // silently no-op. Prompt for the grant instead; the snippet is already on the
+        // clipboard, so they can paste manually in the meantime.
+        guard AXIsProcessTrusted() else {
+            AppDelegate.promptForAccessibility()
+            return
+        }
+
+        // Hand keyboard focus back to the app the user was in, then paste.
+        // Safe to activate immediately: popover.animates is false, so performClose
+        // above is synchronous and the popover window has already resigned key.
+        target?.activate()
+        // Brief delay so the window server finishes handing focus to the target app
+        // before the synthetic Cmd+V fires.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            AppDelegate.simulatePaste()
+        }
+    }
+
+    // Open the Accessibility prompt (and System Settings pane) so the user can
+    // grant the permission synthetic key events require.
+    private static func promptForAccessibility() {
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+    }
+
+    // Synthesize a Cmd+V keystroke. virtualKey 9 is the hardware keycode for V
+    // on every Mac keyboard layout. Requires Accessibility trust (AXIsProcessTrusted);
+    // the caller verifies that before invoking this.
+    private static func simulatePaste() {
+        let src = CGEventSource(stateID: .hidSystemState)
+        guard let down = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true),
+              let up   = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: false) else { return }
+        down.flags = .maskCommand
+        up.flags   = .maskCommand
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+    }
+
     // Drop the host window's alpha to 0 before tearing it down so the
     // WindowServer doesn't composite a residual popover frame over a
     // GPU-rendered foreground app (Zed, etc.) while the close completes —
@@ -423,6 +479,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             closePopover()
             togglePopoverRetries = 0
             return
+        }
+        // Record who was in front before we steal focus, so auto-paste can hand it back.
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            previousApp = front
         }
         // With no menu-bar icon, fall back to the main window instead.
         guard let button = statusItem?.button else {
@@ -590,6 +651,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func popoverWillClose() {
         store.saveAll()
+        // Clear the captured app on every close so a stale reference can never
+        // receive a paste. The auto-paste handler reads previousApp into a local
+        // before calling closePopover(), so nilling here doesn't affect that path.
+        previousApp = nil
         if let anchor = popoverAnchorWindow {
             anchor.orderOut(nil)
             popoverAnchorWindow = nil
@@ -651,6 +716,7 @@ extension Notification.Name {
     static let iconStyleChanged   = Notification.Name("FetchIconStyleChanged")
     static let displayModeChanged = Notification.Name("FetchDisplayModeChanged")
     static let closePopover       = Notification.Name("FetchClosePopover")
+    static let closePopoverAndPaste = Notification.Name("FetchClosePopoverAndPaste")
     static let openSettingsTab    = Notification.Name("FetchOpenSettingsTab")
 }
 

@@ -550,8 +550,15 @@ struct SnippetListView: View {
                 if let i = store.focusedIndex, i < snippets.count {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippets[i].code, forType: .string)
-                    postToast("Copied")
-                    onCopyFlash(i)
+                    let autoPaste = (UserDefaults.standard.object(forKey: "fetchAutoPaste") as? Bool) ?? false
+                    if autoPaste {
+                        // Popover is about to close and paste into the previous app —
+                        // skip the toast and flash; neither would be visible.
+                        NotificationCenter.default.post(name: .closePopoverAndPaste, object: nil)
+                    } else {
+                        postToast("Copied")
+                        onCopyFlash(i)
+                    }
                 }
                 return true
 
