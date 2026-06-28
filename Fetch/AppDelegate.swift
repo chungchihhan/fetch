@@ -365,12 +365,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc func handleClosePopoverAndPaste() {
+    @objc private func handleClosePopoverAndPaste() {
+        let target = previousApp
+        previousApp = nil           // consume once; don't let a stale app get a spurious paste
         if popover?.isShown == true {
             closePopover()
         }
         // Hand keyboard focus back to the app the user was in, then paste.
-        previousApp?.activate()
+        // Safe to activate immediately: popover.animates is false, so performClose
+        // above is synchronous and the popover window has already resigned key.
+        target?.activate()
+        // Brief delay so the window server finishes handing focus to the target app
+        // before the synthetic Cmd+V fires.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             AppDelegate.simulatePaste()
         }
