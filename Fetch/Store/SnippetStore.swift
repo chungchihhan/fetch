@@ -204,6 +204,27 @@ final class SnippetStore {
 
     private func loadAll() {
         for i in 0..<6 { load(tab: i) }
+        migrateLegacyLanguagesIfNeeded()
+    }
+
+    // Before the per-snippet language picker existed, every snippet was stored
+    // with the old hardcoded default "bash" (no language was ever chosen). Map
+    // those to "auto" once so existing snippets get auto-detected highlighting.
+    // A flag makes this run a single time, so a future explicit "bash" pick is
+    // preserved. Only rewrites tabs that loaded successfully (never clobbers a
+    // file we couldn't read).
+    private func migrateLegacyLanguagesIfNeeded() {
+        let flag = "fetchLanguageMigratedV1"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        for tab in 0..<6 where loadSucceeded[tab] {
+            var changed = false
+            for i in tabs[tab].indices where tabs[tab][i].language == "bash" {
+                tabs[tab][i].language = "auto"
+                changed = true
+            }
+            if changed { save(tab: tab) }
+        }
+        UserDefaults.standard.set(true, forKey: flag)
     }
 
     private func fileURL(for tab: Int) -> URL {
