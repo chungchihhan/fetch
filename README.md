@@ -74,6 +74,14 @@ Stop hunting for that one AI prompt or long terminal command. Fetch keeps them c
 
 ## Installation
 
+**Homebrew:**
+
+```bash
+brew install --cask chungchihhan/tap/fetch-snippets
+```
+
+Fetch checks for new releases and offers to install them, including when installed with Homebrew. Homebrew itself does not run upgrades on a schedule; you can also update through Homebrew with `brew update && brew upgrade --cask chungchihhan/tap/fetch-snippets`. The Cask lives in the [existing Homebrew tap](https://github.com/chungchihhan/homebrew-tap), which refreshes its version and checksum from Fetch releases.
+
 **One-line install:**
 
 ```bash

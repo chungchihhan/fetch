@@ -135,14 +135,17 @@ final class Updater {
 
         let cmd = #"""
         set -e
-        curl -fsSL "https://github.com/\#(repoOwner)/\#(repoName)/releases/latest/download/Fetch.zip" -o /tmp/Fetch.zip
-        unzip -oq /tmp/Fetch.zip -d /Applications
-        xattr -cr /Applications/Fetch.app
+        app="$1"
+        archive="$(mktemp /tmp/Fetch.XXXXXX)"
+        trap 'rm -f "$archive"' EXIT
+        curl -fsSL "https://github.com/\#(repoOwner)/\#(repoName)/releases/latest/download/Fetch.zip" -o "$archive"
+        unzip -oq "$archive" -d "$(dirname "$app")"
+        xattr -cr "$app"
         """#
 
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        p.arguments = ["-c", cmd]
+        p.arguments = ["-c", cmd, "fetch-update", Bundle.main.bundleURL.path]
 
         p.terminationHandler = { [weak self] proc in
             DispatchQueue.main.async {
@@ -171,7 +174,7 @@ final class Updater {
     func relaunch() {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1 && open /Applications/Fetch.app"]
+        task.arguments = ["-c", "sleep 1 && open \"$1\"", "fetch-relaunch", Bundle.main.bundleURL.path]
         try? task.run()
         NSApp.terminate(nil)
     }
